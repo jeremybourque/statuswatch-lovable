@@ -126,10 +126,11 @@ Deno.serve(async (req) => {
 {
   "name": "Page name/title",
   "services": [
-    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance" }
+    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null" }
   ]
 }
 IMPORTANT: Extract ALL services listed on the page, not just the first one. Look for every component/service entry.
+If services are organized into groups/categories, include the group name in each service's "group" field. If a service has no group, set "group" to null.
 Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational". For the "name" field, remove any trailing suffixes like "| Status", "Status", "- Status Page", etc. Return just the clean company/product name.`,
           },
           {

@@ -11,6 +11,7 @@ import { statusConfig, type ServiceStatus } from "@/lib/statusData";
 interface ExtractedService {
   name: string;
   status: ServiceStatus;
+  group?: string | null;
 }
 
 interface ExtractedData {
@@ -85,6 +86,7 @@ const AdminClonePage = () => {
         const services = extracted.services.map((s, i) => ({
           name: s.name,
           status: s.status,
+          group_name: s.group || null,
           status_page_id: page.id,
           display_order: i,
         }));
@@ -174,28 +176,46 @@ const AdminClonePage = () => {
               </div>
             </div>
 
-            {extracted.services?.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm">Services ({extracted.services.length})</Label>
-                <div className="space-y-1.5">
-                  {extracted.services.map((s, i) => {
-                    const config = statusConfig[s.status] ?? statusConfig.operational;
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2"
-                      >
-                        <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-                        <span className="text-sm text-foreground">{s.name}</span>
-                        <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>
-                          {config.label}
-                        </span>
-                      </div>
-                    );
-                  })}
+            {extracted.services?.length > 0 && (() => {
+              // Group services by their group name
+              const groups = new Map<string, ExtractedService[]>();
+              extracted.services.forEach((s) => {
+                const key = s.group || "";
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(s);
+              });
+              const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
+              
+              return (
+                <div className="space-y-3">
+                  <Label className="text-sm">Services ({extracted.services.length})</Label>
+                  {Array.from(groups.entries()).map(([groupName, groupServices]) => (
+                    <div key={groupName || "__ungrouped"} className="space-y-1.5">
+                      {hasGroups && (
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">
+                          {groupName || "Ungrouped"}
+                        </p>
+                      )}
+                      {groupServices.map((s, i) => {
+                        const config = statusConfig[s.status] ?? statusConfig.operational;
+                        return (
+                          <div
+                            key={`${groupName}-${i}`}
+                            className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2"
+                          >
+                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
+                            <span className="text-sm text-foreground">{s.name}</span>
+                            <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>
+                              {config.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <Button
               onClick={handleCreate}
