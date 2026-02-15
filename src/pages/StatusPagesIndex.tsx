@@ -1,11 +1,12 @@
 import { useStatusPages } from "@/hooks/useStatusData";
 import { statusConfig } from "@/lib/statusData";
-import { Activity, Loader2, ArrowUpRight } from "lucide-react";
+import { Activity, Loader2, ArrowUpRight, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 function usePageServices(pageId: string) {
   return useQuery({
@@ -120,6 +121,12 @@ const StatusPagesIndex = () => {
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">StatusWatch</h1>
+          <Link to="/admin" className="ml-auto">
+            <Button variant="ghost" size="sm">
+              <Settings className="h-4 w-4 mr-1" />
+              Admin
+            </Button>
+          </Link>
         </div>
       </header>
 
