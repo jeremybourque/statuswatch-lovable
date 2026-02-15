@@ -47,6 +47,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        status: {
+          operational: "hsl(var(--status-operational))",
+          "operational-foreground": "hsl(var(--status-operational-foreground))",
+          degraded: "hsl(var(--status-degraded))",
+          "degraded-foreground": "hsl(var(--status-degraded-foreground))",
+          partial: "hsl(var(--status-partial))",
+          "partial-foreground": "hsl(var(--status-partial-foreground))",
+          major: "hsl(var(--status-major))",
+          "major-foreground": "hsl(var(--status-major-foreground))",
+          maintenance: "hsl(var(--status-maintenance))",
+          "maintenance-foreground": "hsl(var(--status-maintenance-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
