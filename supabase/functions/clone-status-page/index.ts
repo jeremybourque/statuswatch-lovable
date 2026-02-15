@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     }
 
     // Truncate HTML to avoid token limits
-    const truncatedHtml = html.slice(0, 30000);
+    const truncatedHtml = html.slice(0, 100000);
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
     { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance" }
   ]
 }
+IMPORTANT: Extract ALL services listed on the page, not just the first one. Look for every component/service entry.
 Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational". For the "name" field, remove any trailing suffixes like "| Status", "Status", "- Status Page", etc. Return just the clean company/product name.`,
           },
           {
