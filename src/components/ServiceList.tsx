@@ -19,25 +19,22 @@ export function ServiceList({ services }: { services: Service[] }) {
       {services.map((service, index) => (
         <div
           key={service.id}
-          className={`flex items-center justify-between p-4 bg-card ${
+          className={`p-4 bg-card ${
             index !== services.length - 1 ? "border-b border-border" : ""
           }`}
         >
-          <div className="flex items-center gap-3 min-w-0">
-            <StatusDot status={service.status} />
-            <span className="font-medium text-card-foreground truncate">{service.name}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <StatusDot status={service.status} />
+              <span className="font-medium text-card-foreground truncate">{service.name}</span>
+            </div>
+            <span className={`text-sm font-medium ${statusConfig[service.status].colorClass}`}>
+              {statusConfig[service.status].label}
+            </span>
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block">
-              <UptimeBar days={service.uptimeDays} />
-            </div>
-            <div className="flex items-center gap-2 min-w-[140px] justify-end">
-              <span className="font-mono text-sm text-muted-foreground">{service.uptime.toFixed(2)}%</span>
-              <span className={`text-sm font-medium ${statusConfig[service.status].colorClass}`}>
-                {statusConfig[service.status].label}
-              </span>
-            </div>
+          <div className="flex items-center gap-3 mt-2 ml-6">
+            <UptimeBar days={service.uptimeDays} />
+            <span className="font-mono text-sm text-muted-foreground shrink-0">{service.uptime.toFixed(2)}%</span>
           </div>
         </div>
       ))}
