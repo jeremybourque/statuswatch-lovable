@@ -30,7 +30,15 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
         return (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
-              <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
+              {s.status === "operational" ? (
+                <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
+              ) : (
+                <div className="w-3 h-3 hover:opacity-80 transition-opacity cursor-default flex items-center justify-center">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <polygon points="6,1 11,11 1,11" className={`fill-current ${config.colorClass}`} />
+                  </svg>
+                </div>
+              )}
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               {s.name} — {config.label}
