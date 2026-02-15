@@ -19,10 +19,10 @@ function ServiceCard({ service }: { service: Service }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <>
+    <div className="bg-card hover:bg-accent/50 transition-colors">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 bg-card text-left hover:bg-accent/50 transition-colors"
+        className="w-full flex items-center justify-between p-4 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
           <StatusDot status={service.status} />
@@ -38,14 +38,14 @@ function ServiceCard({ service }: { service: Service }) {
         </div>
       </button>
       {expanded && (
-        <div className="px-4 pb-4 bg-card">
+        <div className="px-4 pb-4">
           <div className="flex items-center gap-3 ml-6">
             <UptimeBar days={service.uptimeDays} />
             <span className="font-mono text-sm text-muted-foreground shrink-0">{service.uptime.toFixed(2)}%</span>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
