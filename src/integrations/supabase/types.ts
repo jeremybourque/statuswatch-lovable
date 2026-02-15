@@ -52,6 +52,7 @@ export type Database = {
           id: string
           impact: string
           status: string
+          status_page_id: string
           title: string
           updated_at: string
         }
@@ -60,6 +61,7 @@ export type Database = {
           id?: string
           impact?: string
           status?: string
+          status_page_id: string
           title: string
           updated_at?: string
         }
@@ -68,10 +70,19 @@ export type Database = {
           id?: string
           impact?: string
           status?: string
+          status_page_id?: string
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "incidents_status_page_id_fkey"
+            columns: ["status_page_id"]
+            isOneToOne: false
+            referencedRelation: "status_pages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
@@ -80,6 +91,7 @@ export type Database = {
           id: string
           name: string
           status: string
+          status_page_id: string
           updated_at: string
           uptime: number
         }
@@ -89,6 +101,7 @@ export type Database = {
           id?: string
           name: string
           status?: string
+          status_page_id: string
           updated_at?: string
           uptime?: number
         }
@@ -98,8 +111,47 @@ export type Database = {
           id?: string
           name?: string
           status?: string
+          status_page_id?: string
           updated_at?: string
           uptime?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_status_page_id_fkey"
+            columns: ["status_page_id"]
+            isOneToOne: false
+            referencedRelation: "status_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      status_pages: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
