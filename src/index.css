@@ -41,7 +41,7 @@
     --status-degraded: 45 93% 47%;
     --status-partial: 25 95% 53%;
     --status-major: 0 72% 51%;
-    --status-maintenance: 220 14% 46%;
+    --status-maintenance: 217 91% 60%;
 
     /* Status foregrounds */
     --status-operational-foreground: 0 0% 100%;
