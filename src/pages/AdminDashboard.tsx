@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStatusPages, type StatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Check, X, Server } from "lucide-react";
+import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Check, X, Server, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,12 +163,20 @@ const AdminDashboard = () => {
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Status Pages</h2>
-          <Link to="/admin/new">
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Page
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/admin/clone">
+              <Button size="sm" variant="outline">
+                <Globe className="h-4 w-4 mr-1" />
+                Clone from URL
+              </Button>
+            </Link>
+            <Link to="/admin/new">
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Page
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {isLoading ? (
