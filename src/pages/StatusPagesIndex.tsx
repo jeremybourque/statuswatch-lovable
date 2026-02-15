@@ -46,7 +46,7 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
                     d="M6 0.5 L11.5 11 L0.5 11 Z"
                     fill="currentColor"
                     stroke="currentColor"
-                    strokeWidth="10"
+                    strokeWidth="7"
                     strokeLinejoin="round"
                     className={config.colorClass}
                   />
