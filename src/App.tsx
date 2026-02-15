@@ -7,6 +7,7 @@ import StatusPagesIndex from "./pages/StatusPagesIndex";
 import StatusPageDetail from "./pages/StatusPageDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminNewPage from "./pages/AdminNewPage";
+import AdminServices from "./pages/AdminServices";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
           <Route path="/" element={<StatusPagesIndex />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/new" element={<AdminNewPage />} />
+          <Route path="/admin/:slug/services" element={<AdminServices />} />
           <Route path="/:slug" element={<StatusPageDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
