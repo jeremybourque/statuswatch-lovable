@@ -44,6 +44,29 @@ async function fetchWithRetries(url: string): Promise<Response> {
   throw new Error("All fetch attempts were blocked by the target site. Try a different URL.");
 }
 
+function stripHtml(html: string): string {
+  // Remove script, style, svg, noscript, head tags and their contents
+  let cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    // Remove HTML comments
+    .replace(/<!--[\s\S]*?-->/g, "")
+    // Remove data attributes and long attribute values to save tokens
+    .replace(/\s+data-[\w-]+="[^"]*"/g, "")
+    .replace(/\s+style="[^"]*"/g, "")
+    .replace(/\s+class="[^"]*"/g, " ")
+    // Collapse whitespace
+    .replace(/\s{2,}/g, " ")
+    .replace(/>\s+</g, "><");
+  
+  return cleaned;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -83,7 +106,10 @@ Deno.serve(async (req) => {
     }
 
     // Truncate HTML to avoid token limits
-    const truncatedHtml = html.slice(0, 500000);
+    // Strip non-content HTML to maximize useful content within token limits
+    const strippedHtml = stripHtml(html);
+    console.log("Stripped HTML length:", strippedHtml.length);
+    const truncatedHtml = strippedHtml.slice(0, 500000);
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
