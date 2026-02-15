@@ -37,8 +37,8 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
                 />
               ) : (
                 <svg
-                  width="13"
-                  height="14"
+                  width="14"
+                  height="13"
                   viewBox="-2 -2 16 16"
                   className="hover:opacity-80 transition-opacity cursor-default"
                 >
