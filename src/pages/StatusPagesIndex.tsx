@@ -32,10 +32,24 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
           <Tooltip key={i}>
             <TooltipTrigger asChild>
               {isOperational ? (
-                <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
+                <div
+                  className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`}
+                />
               ) : (
-                <svg width="14" height="14" viewBox="-2 -2 16 16" className="hover:opacity-80 transition-opacity cursor-default">
-                  <path d="M6 0.5 L11.5 11 L0.5 11 Z" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" className={config.colorClass} />
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="-2 -2 16 16"
+                  className="hover:opacity-80 transition-opacity cursor-default"
+                >
+                  <path
+                    d="M6 0.5 L11.5 11 L0.5 11 Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    strokeLinejoin="round"
+                    className={config.colorClass}
+                  />
                 </svg>
               )}
             </TooltipTrigger>
@@ -79,7 +93,9 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2 w-2 shrink-0">
             {overall !== "operational" && (
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`}
+              />
             )}
             <span className={`relative inline-flex rounded-full h-2 w-2 ${config.dotClass}`} />
           </span>
