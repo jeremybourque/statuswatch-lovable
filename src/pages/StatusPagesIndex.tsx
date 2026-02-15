@@ -22,22 +22,61 @@ function usePageServices(pageId: string) {
   });
 }
 
-function ServiceDots({ services }: { services: { name: string; status: ServiceStatus }[] }) {
+const STATUS_COLORS: Record<ServiceStatus, string> = {
+  operational: "hsl(var(--status-operational))",
+  degraded: "hsl(var(--status-degraded))",
+  partial: "hsl(var(--status-partial))",
+  major: "hsl(var(--status-major))",
+  maintenance: "hsl(var(--status-maintenance))",
+};
+
+function ServiceRing({ services }: { services: { name: string; status: ServiceStatus }[] }) {
+  const size = 64;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const gap = services.length > 1 ? 0.04 : 0; // gap in radians
+  const totalGap = gap * services.length;
+  const usable = circumference * (1 - totalGap / (2 * Math.PI));
+  const segmentLength = services.length > 0 ? usable / services.length : 0;
+  const gapLength = (circumference * gap) / (2 * Math.PI);
+
+  let offset = 0;
+
   return (
-    <div className="flex flex-wrap gap-1.5 justify-center">
-      {services.map((s, i) => {
-        const config = statusConfig[s.status];
-        return (
-          <Tooltip key={i}>
-            <TooltipTrigger asChild>
-              <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {s.name} — {config.label}
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
+    <div className="relative flex items-center justify-center">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        {services.map((s, i) => {
+          const dash = `${segmentLength} ${circumference - segmentLength}`;
+          const currentOffset = offset;
+          offset += segmentLength + gapLength;
+          return (
+            <Tooltip key={i}>
+              <TooltipTrigger asChild>
+                <circle
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill="none"
+                  stroke={STATUS_COLORS[s.status]}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={dash}
+                  strokeDashoffset={-currentOffset}
+                  strokeLinecap="round"
+                  className="transition-all duration-300 hover:opacity-70 cursor-default"
+                  style={{ filter: s.status !== "operational" ? `drop-shadow(0 0 3px ${STATUS_COLORS[s.status]})` : undefined }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {s.name} — {statusConfig[s.status].label}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </svg>
+      <span className="absolute text-[10px] font-bold text-muted-foreground">
+        {services.filter((s) => s.status === "operational").length}/{services.length}
+      </span>
     </div>
   );
 }
@@ -65,7 +104,7 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
       </div>
 
       <div className="flex-1 flex items-center justify-center py-3">
-        <ServiceDots services={services} />
+        <ServiceRing services={services} />
       </div>
 
       <div className="flex items-center justify-between mt-3">
