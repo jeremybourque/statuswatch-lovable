@@ -14,7 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      incident_updates: {
+        Row: {
+          created_at: string
+          id: string
+          incident_id: string
+          message: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incident_id: string
+          message: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incident_id?: string
+          message?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_updates_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          created_at: string
+          id: string
+          impact: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          impact?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          impact?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          uptime: number
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          uptime?: number
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          uptime?: number
+        }
+        Relationships: []
+      }
+      uptime_days: {
+        Row: {
+          day: string
+          id: string
+          service_id: string
+          up: boolean
+        }
+        Insert: {
+          day: string
+          id?: string
+          service_id: string
+          up?: boolean
+        }
+        Update: {
+          day?: string
+          id?: string
+          service_id?: string
+          up?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uptime_days_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
