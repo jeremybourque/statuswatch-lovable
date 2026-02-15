@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStatusPages, type StatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Check, X } from "lucide-react";
+import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Check, X, Server } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,11 @@ function EditableRow({ page, onDelete }: { page: StatusPage; onDelete: (id: stri
           )}
         </div>
         <div className="flex items-center gap-1">
+          <Link to={`/admin/${page.slug}/services`}>
+            <Button variant="ghost" size="icon" title="Manage services">
+              <Server className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" onClick={startEdit}>
             <Pencil className="h-4 w-4" />
           </Button>
