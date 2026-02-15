@@ -2,23 +2,40 @@ import { StatusBanner } from "@/components/StatusBanner";
 import { ServiceList } from "@/components/ServiceList";
 import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { getOverallStatus } from "@/lib/statusData";
-import { useServices, useIncidents } from "@/hooks/useStatusData";
-import { Activity, Loader2 } from "lucide-react";
+import { useServices, useIncidents, useStatusPage } from "@/hooks/useStatusData";
+import { Activity, Loader2, ArrowLeft } from "lucide-react";
+import { useParams, Link } from "react-router-dom";
+import NotFound from "./NotFound";
 
-const Index = () => {
-  const { data: services = [], isLoading: loadingServices } = useServices();
-  const { data: incidents = [], isLoading: loadingIncidents } = useIncidents();
+const StatusPageDetail = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: page, isLoading: loadingPage } = useStatusPage(slug ?? "");
+  const { data: services = [], isLoading: loadingServices } = useServices(page?.id);
+  const { data: incidents = [], isLoading: loadingIncidents } = useIncidents(page?.id);
   const overallStatus = getOverallStatus(services);
+
+  if (loadingPage) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!page) return <NotFound />;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
             <Activity className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-bold text-foreground tracking-tight">StatusWatch</h1>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">{page.name}</h1>
           </div>
-          <span className="text-sm text-muted-foreground font-mono">status.example.com</span>
+          <span className="text-sm text-muted-foreground font-mono">{page.slug}</span>
         </div>
       </header>
 
@@ -59,4 +76,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default StatusPageDetail;
