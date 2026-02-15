@@ -55,37 +55,34 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   return (
     <Link
       to={`/${page.slug}`}
-      className="group relative flex flex-col justify-between aspect-square border border-border rounded-xl bg-card p-6 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden"
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${config.bgClass}`} />
 
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            {overall !== "operational" && (
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
-            )}
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${config.dotClass}`} />
-          </span>
-          <span className={`text-xs font-semibold uppercase tracking-wider ${config.colorClass}`}>
-            {config.label}
-          </span>
-        </div>
-        <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="flex items-start justify-between mb-3">
+        <h2 className="text-sm font-bold text-card-foreground leading-tight">{page.name}</h2>
+        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
       </div>
 
-      <div className="flex items-center justify-center py-2">
+      <div className="flex-1 flex items-center justify-center py-3">
         <ServiceDots services={services} />
       </div>
 
-      <div>
-        <h2 className="text-lg font-bold text-card-foreground">{page.name}</h2>
-        {page.description && (
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{page.description}</p>
-        )}
-        <p className="text-xs text-muted-foreground mt-3 font-mono">
-          {services.length} service{services.length !== 1 ? "s" : ""} monitored
-        </p>
+      <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2 shrink-0">
+            {overall !== "operational" && (
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
+            )}
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${config.dotClass}`} />
+          </span>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${config.colorClass}`}>
+            {config.label}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {services.length} service{services.length !== 1 ? "s" : ""}
+        </span>
       </div>
     </Link>
   );
@@ -112,7 +109,7 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {pages.map((page) => (
               <StatusPageCard key={page.id} page={page} />
             ))}
