@@ -10,8 +10,16 @@ const updateStatusColors: Record<string, string> = {
   resolved: "text-status-operational",
 };
 
+const updateStatusBg: Record<string, string> = {
+  investigating: "bg-status-major",
+  identified: "bg-status-partial",
+  monitoring: "bg-status-degraded",
+  resolved: "bg-status-operational",
+};
+
 function IncidentCard({ incident }: { incident: Incident }) {
   const [expanded, setExpanded] = useState(incident.status !== "resolved");
+  const latestStatus = incident.updates.length > 0 ? incident.updates[0].status : incident.status;
 
   return (
     <div className="border border-border rounded-lg bg-card overflow-hidden">
@@ -20,7 +28,7 @@ function IncidentCard({ incident }: { incident: Incident }) {
         className="w-full flex items-center justify-between p-4 text-left hover:bg-accent/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className={`w-1.5 h-8 rounded-full ${statusConfig[incident.impact].bgClass}`} />
+          <div className={`w-1.5 h-8 rounded-full ${updateStatusBg[latestStatus]}`} />
           <div>
             <h3 className="font-semibold text-card-foreground">{incident.title}</h3>
             <p className="text-sm text-muted-foreground mt-0.5">
