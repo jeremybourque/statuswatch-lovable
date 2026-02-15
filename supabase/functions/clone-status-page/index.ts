@@ -20,11 +20,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch the status page HTML
+    // Fetch the status page HTML with browser-like headers
     console.log("Fetching URL:", url);
-    const pageRes = await fetch(url, {
-      headers: { "User-Agent": "StatusWatch-Cloner/1.0" },
-    });
+    const browserHeaders = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Referer": new URL(url).origin,
+    };
+
+    let pageRes = await fetch(url, { headers: browserHeaders });
+
+    // Retry with a different User-Agent if blocked
+    if (pageRes.status === 403) {
+      console.warn("Got 403, retrying with alternate headers");
+      pageRes = await fetch(url, {
+        headers: {
+          ...browserHeaders,
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        },
+      });
+    }
+
     if (!pageRes.ok) {
       return new Response(
         JSON.stringify({ success: false, error: `Failed to fetch page: ${pageRes.status}` }),
