@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     }
 
     // Truncate HTML to avoid token limits
-    const truncatedHtml = html.slice(0, 100000);
+    const truncatedHtml = html.slice(0, 500000);
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
