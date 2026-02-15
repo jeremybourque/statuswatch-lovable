@@ -34,8 +34,8 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
               {isOperational ? (
                 <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
               ) : (
-                <svg width="12" height="12" viewBox="0 0 12 12" className="hover:opacity-80 transition-opacity cursor-default">
-                  <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill="currentColor" strokeLinejoin="round" className={config.colorClass} />
+                <svg width="12" height="12" viewBox="-1 -1 14 14" className="hover:opacity-80 transition-opacity cursor-default">
+                  <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className={config.colorClass} />
                 </svg>
               )}
             </TooltipTrigger>
