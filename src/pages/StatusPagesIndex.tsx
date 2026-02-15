@@ -1,13 +1,11 @@
 import { useStatusPages } from "@/hooks/useStatusData";
 import { statusConfig } from "@/lib/statusData";
-import { Activity, Loader2, ArrowUpRight, Plus, LogIn, LogOut } from "lucide-react";
+import { Activity, Loader2, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth, useIsAdmin } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 
 function usePageServices(pageId: string) {
   return useQuery({
@@ -92,8 +90,6 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
 
 const StatusPagesIndex = () => {
   const { data: pages = [], isLoading } = useStatusPages();
-  const { user } = useAuth();
-  const isAdmin = useIsAdmin();
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,22 +97,6 @@ const StatusPagesIndex = () => {
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">StatusWatch</h1>
-          <div className="ml-auto flex items-center gap-2">
-            {isAdmin && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/new"><Plus className="h-4 w-4 mr-1" />New</Link>
-              </Button>
-            )}
-            {user ? (
-              <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
-                <LogOut className="h-4 w-4 mr-1" />Sign out
-              </Button>
-            ) : (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/auth"><LogIn className="h-4 w-4 mr-1" />Sign in</Link>
-              </Button>
-            )}
-          </div>
         </div>
       </header>
 
