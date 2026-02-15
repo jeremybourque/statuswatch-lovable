@@ -27,10 +27,16 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
     <div className="flex flex-wrap gap-1.5 justify-center">
       {services.map((s, i) => {
         const config = statusConfig[s.status];
+        const isOperational = s.status === "operational";
         return (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
-              <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
+              <div
+                className={`${config.bgClass} hover:opacity-80 transition-opacity cursor-default ${
+                  isOperational ? "w-3 h-3 rounded-sm" : "w-3 h-3"
+                }`}
+                style={!isOperational ? { clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)" } : undefined}
+              />
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               {s.name} — {config.label}
