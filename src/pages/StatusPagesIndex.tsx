@@ -31,12 +31,13 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
         return (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
-              <div
-                className={`${config.bgClass} hover:opacity-80 transition-opacity cursor-default ${
-                  isOperational ? "w-3 h-3 rounded-sm" : "w-3 h-3"
-                }`}
-                style={!isOperational ? { clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)" } : undefined}
-              />
+              {isOperational ? (
+                <div className={`w-3 h-3 rounded-sm ${config.bgClass} hover:opacity-80 transition-opacity cursor-default`} />
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 12 12" className="hover:opacity-80 transition-opacity cursor-default">
+                  <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill="currentColor" strokeLinejoin="round" className={config.colorClass} />
+                </svg>
+              )}
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               {s.name} — {config.label}
