@@ -3,8 +3,46 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+async function fetchWithRetries(url: string): Promise<Response> {
+  const attempts = [
+    {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+      "Cache-Control": "max-age=0",
+    },
+    {
+      "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Accept": "text/html",
+    },
+    {
+      "User-Agent": "facebookexternalhit/1.1",
+      "Accept": "text/html",
+    },
+  ];
+
+  for (const headers of attempts) {
+    try {
+      const res = await fetch(url, { headers, redirect: "follow" });
+      if (res.ok) return res;
+      console.warn(`Attempt failed with status ${res.status}, trying next...`);
+      // Consume body to free resources
+      await res.text();
+    } catch (e) {
+      console.warn(`Fetch attempt failed:`, e.message);
+    }
+  }
+
+  throw new Error("All fetch attempts were blocked by the target site. Try a different URL.");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,36 +58,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch the status page HTML with browser-like headers
     console.log("Fetching URL:", url);
-    const browserHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Accept-Encoding": "gzip, deflate, br",
-      "Referer": new URL(url).origin,
-    };
-
-    let pageRes = await fetch(url, { headers: browserHeaders });
-
-    // Retry with a different User-Agent if blocked
-    if (pageRes.status === 403) {
-      console.warn("Got 403, retrying with alternate headers");
-      pageRes = await fetch(url, {
-        headers: {
-          ...browserHeaders,
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-        },
-      });
-    }
-
-    if (!pageRes.ok) {
+    
+    let html: string;
+    try {
+      const pageRes = await fetchWithRetries(url);
+      html = await pageRes.text();
+    } catch (fetchErr) {
       return new Response(
-        JSON.stringify({ success: false, error: `Failed to fetch page: ${pageRes.status}` }),
+        JSON.stringify({ success: false, error: fetchErr.message }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const html = await pageRes.text();
+
+    console.log("Fetched HTML length:", html.length);
 
     // Use AI to extract structured data
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
