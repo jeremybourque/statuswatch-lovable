@@ -1,0 +1,1 @@
+ALTER TABLE public.services ADD COLUMN group_name text;

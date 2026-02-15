@@ -50,14 +50,34 @@ function ServiceCard({ service }: { service: Service }) {
 }
 
 export function ServiceList({ services }: { services: Service[] }) {
+  // Group services by group_name
+  const groups = new Map<string, Service[]>();
+  services.forEach((s) => {
+    const key = (s as any).group_name || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  });
+  const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
+
   return (
-    <div className="space-y-0 border border-border rounded-lg overflow-hidden">
-      {services.map((service, index) => (
-        <div
-          key={service.id}
-          className={index !== services.length - 1 ? "border-b border-border" : ""}
-        >
-          <ServiceCard service={service} />
+    <div className="space-y-6">
+      {Array.from(groups.entries()).map(([groupName, groupServices]) => (
+        <div key={groupName || "__ungrouped"}>
+          {hasGroups && (
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              {groupName || "Other"}
+            </h3>
+          )}
+          <div className="space-y-0 border border-border rounded-lg overflow-hidden">
+            {groupServices.map((service, index) => (
+              <div
+                key={service.id}
+                className={index !== groupServices.length - 1 ? "border-b border-border" : ""}
+              >
+                <ServiceCard service={service} />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
