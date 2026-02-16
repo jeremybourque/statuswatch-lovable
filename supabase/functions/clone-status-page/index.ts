@@ -206,21 +206,40 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 
     const pass2 = await callAI(
       apiKey,
-      `You extract uptime data from status page HTML. You are given a list of known service names. For each service, extract:
-- "uptime_pct": the uptime percentage shown (a number like 99.99), or null if not visible
-- "uptime_days": an array of daily up/down data from the uptime bar/chart. Each element: true (up/green), false (down/red/orange), or null (no data/gray). Ordered oldest to newest (left to right). If no daily bar is visible for that service, set to null.
+      `You extract uptime bar data from status page HTML. You are given a list of known service names.
+
+For each service, find the uptime/history bar chart — it is typically rendered as a row of small colored rectangles (divs or spans), one per day. Each bar element's color or CSS class indicates the status for that day:
+- GREEN / "operational" / "up" / "no-incidents" → true
+- RED / ORANGE / YELLOW / "major" / "minor" / "down" / "degraded" / "partial" / "disruption" / "incident" → false  
+- GRAY / "empty" / "no-data" / "unknown" → null
+
+CRITICAL RULES:
+1. Do NOT assume all bars are green. Carefully inspect each bar element's class, color, background-color, or data attributes individually.
+2. Any bar that is NOT green/operational MUST be false. Look for classes containing words like: major, minor, down, degraded, partial, disrupted, incident, outage, red, orange, yellow, warning, error.
+3. Count the exact number of bar elements per service. The array length must match the number of bars rendered.
+4. Order: oldest (leftmost) to newest (rightmost).
+5. Also extract "uptime_pct" if a percentage like "99.99% uptime" is shown near the service name.
 
 Return ONLY valid JSON:
 {
   "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, null, false] }
+    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
   ]
 }
 Match service names EXACTLY as provided. Only include services from the provided list.`,
-      `Known services: ${JSON.stringify(serviceNames)}\n\nExtract uptime percentage and daily uptime bar data for each service from this HTML:`,
+      `Known services: ${JSON.stringify(serviceNames)}\n\nCarefully extract the uptime bar data for each service. Pay special attention to bars that are NOT green — these represent incidents/outages and MUST be marked as false:`,
       uptimeHtml
     );
 
+    // Log summary of extracted bar data for debugging
+    for (const s of (pass2.services || [])) {
+      const days = s.uptime_days;
+      if (Array.isArray(days)) {
+        const falseCount = days.filter((d: any) => d === false).length;
+        const nullCount = days.filter((d: any) => d === null).length;
+        console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+      }
+    }
     console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
 
     // ── Merge passes ──
