@@ -34,6 +34,34 @@ function getGroupStatus(services: ExtractedService[]): ServiceStatus {
   return "operational";
 }
 
+function ExtractedServiceItem({ service }: { service: ExtractedService }) {
+  const [expanded, setExpanded] = useState(false);
+  const config = statusConfig[service.status] ?? statusConfig.operational;
+
+  return (
+    <div className="bg-background hover:bg-accent/50 transition-colors">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
+          <span className="text-sm font-medium text-card-foreground">{service.name}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${config.colorClass}`}>{config.label}</span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3">
+          <p className="text-xs text-muted-foreground ml-5">No uptime data yet — will be tracked after creation.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExtractedServiceGroup({ groupName, services }: { groupName: string; services: ExtractedService[] }) {
   const [collapsed, setCollapsed] = useState(false);
   const groupStatus = getGroupStatus(services);
@@ -57,17 +85,12 @@ function ExtractedServiceGroup({ groupName, services }: { groupName: string; ser
         </div>
       </button>
       {!collapsed && (
-        <div className="space-y-1.5">
-          {services.map((s, i) => {
-            const sc = statusConfig[s.status] ?? statusConfig.operational;
-            return (
-              <div key={i} className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2">
-                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${sc.dotClass}`} />
-                <span className="text-sm text-foreground">{s.name}</span>
-                <span className={`text-xs font-medium ml-auto ${sc.colorClass}`}>{sc.label}</span>
-              </div>
-            );
-          })}
+        <div className="space-y-0 border border-border rounded-lg overflow-hidden">
+          {services.map((s, i) => (
+            <div key={i} className={i !== services.length - 1 ? "border-b border-border" : ""}>
+              <ExtractedServiceItem service={s} />
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -100,16 +123,10 @@ function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
         if (section.type === "group") {
           return <ExtractedServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
         }
-        const config = statusConfig[section.service.status] ?? statusConfig.operational;
+        
         return (
-          <div key={`svc-${i}`} className="w-full flex items-center justify-between group">
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {section.service.name}
-              </p>
-            </div>
-            <span className={`text-xs font-medium ${config.colorClass}`}>{config.label}</span>
+          <div key={`svc-${i}`} className="space-y-0 border border-border rounded-lg overflow-hidden">
+            <ExtractedServiceItem service={section.service} />
           </div>
         );
       })}
