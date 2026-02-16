@@ -324,7 +324,7 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
     } else {
       // No deterministic data at all — fall back to AI for the whole page
       console.log("No deterministic bar data found. Falling back to AI for entire page.");
-      const uptimeHtml = stripForUptime(rawHtml);
+      const uptimeHtml = stripForServices(rawHtml);
       try {
         const pass2ai = await callAI(
           apiKey,
