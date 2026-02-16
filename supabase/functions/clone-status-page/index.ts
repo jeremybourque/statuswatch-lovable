@@ -75,6 +75,102 @@ function stripForUptime(html: string): string {
     .replace(/>\s+</g, "><");
 }
 
+/** Deterministically extract uptime bar data from SVG rects in the HTML */
+function extractBarsFromHtml(html: string, serviceNames: string[]): {
+  services: { name: string; uptime_pct: number | null; uptime_days: (boolean | null)[] }[];
+  since_value: string | null;
+} {
+  // Extract since-value from data attributes
+  const sinceMatch = html.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+  const sinceValue = sinceMatch ? sinceMatch[1] : null;
+
+  // Color classification
+  function classifyColor(hex: string): boolean | null {
+    const h = hex.toUpperCase().replace("#", "");
+    // Green shades → operational (true)
+    const greens = ["3CB878", "22C55E", "10B981", "4ADE80", "16A34A", "15803D", "059669", "34D399"];
+    if (greens.includes(h)) return true;
+    // Red shades → outage (false)
+    const reds = ["EF4444", "DC2626", "F87171", "E74C3C", "B91C1C", "FCA5A5", "991B1B"];
+    if (reds.includes(h)) return false;
+    // Orange/Yellow shades → degraded (false)
+    const oranges = ["F59E0B", "F97316", "EAB308", "FB923C", "FBBF24", "D97706", "EA580C"];
+    if (oranges.includes(h)) return false;
+    // Gray shades → no data (null)
+    const grays = ["9CA3AF", "6B7280", "D1D5DB", "E5E7EB", "374151", "4B5563"];
+    if (grays.includes(h)) return null;
+    // Fallback: if it looks greenish, true; reddish, false; else null
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    if (g > r && g > b) return true;
+    if (r > g && r > b) return false;
+    return null;
+  }
+
+  const results: { name: string; uptime_pct: number | null; uptime_days: (boolean | null)[] }[] = [];
+
+  // Find all chart SVG blocks with their associated service context
+  // Each chart is inside a turbo-frame or div after the service heading
+  // Strategy: find all <svg viewBox="0 0 588..."> blocks (chart SVGs have viewBox with width ~588)
+  // and associate them with the nearest preceding service name
+
+  // Build a map of service positions in HTML
+  // Handle HTML entities: & → &amp;, < → &lt; etc.
+  function escapeForHtmlSearch(name: string): string {
+    // First escape regex special chars, THEN replace & with entity pattern
+    const regexEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return regexEscaped.replace(/&/g, "(?:&amp;|&)");
+  }
+
+  for (const serviceName of serviceNames) {
+    const escaped = escapeForHtmlSearch(serviceName);
+    // Find the service name in HTML, then find the FIRST chart SVG after it
+    // Chart SVGs have viewBox="0 0 NNN NN" pattern (uptime charts)
+    const nameRegex = new RegExp(escaped, "i");
+    const nameMatch = html.match(nameRegex);
+
+    if (!nameMatch || nameMatch.index === undefined) {
+      console.warn(`Could not find service name in HTML: ${serviceName}`);
+      results.push({ name: serviceName, uptime_pct: null, uptime_days: [] });
+      continue;
+    }
+
+    // Search for the first chart SVG after this service name
+    const afterName = html.substring(nameMatch.index);
+    // Match chart SVGs specifically (viewBox with large width, containing rect elements)
+    const svgMatch = afterName.match(/<svg[^>]*viewBox="0 0 \d[\d.]+ \d+"[^>]*>([\s\S]*?)<\/svg>/);
+
+    if (!svgMatch) {
+      console.warn(`Could not find chart SVG for service: ${serviceName}`);
+      results.push({ name: serviceName, uptime_pct: null, uptime_days: [] });
+      continue;
+    }
+
+    const svgContent = svgMatch[1];
+
+    // Extract all visible (non-transparent) rect fill colors
+    const rectRegex = /<rect[^>]*style="fill:\s*#([A-Fa-f0-9]{6});?"[^>]*>/g;
+    const days: (boolean | null)[] = [];
+    let rectMatch;
+    while ((rectMatch = rectRegex.exec(svgContent)) !== null) {
+      const fullRect = rectMatch[0];
+      if (fullRect.includes('fill-opacity="0"') || fullRect.includes("fill: transparent")) continue;
+      days.push(classifyColor(rectMatch[1]));
+    }
+
+    // Extract uptime percentage from text after the SVG
+    const svgEnd = html.indexOf(svgMatch[0], nameMatch.index) + svgMatch[0].length;
+    const afterSvg = html.substring(svgEnd, svgEnd + 500);
+    const pctMatch = afterSvg.match(/(\d+\.\d+)%/);
+    const uptimePct = pctMatch ? parseFloat(pctMatch[1]) : null;
+
+    results.push({ name: serviceName, uptime_pct: uptimePct, uptime_days: days });
+  }
+
+  return { services: results, since_value: sinceValue };
+}
+
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, htmlContent: string): Promise<any> {
   const truncated = htmlContent.slice(0, 500000);
 
@@ -196,64 +292,26 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 
     console.log("Pass 1 found", pass1.services?.length ?? 0, "services");
 
-    // ── Extract chart date range from HTML ──
-    // Look for data attributes like: since-value="2025-12-17 00:00:00 UTC"
-    const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-    // Also look for visible date range text like "Dec 2025 - Feb 2026"
-    const startDate = sinceMatch ? sinceMatch[1] : null;
-    console.log("Detected chart start date:", startDate);
-
-    // ── PASS 2: Extract uptime bar data ──
-    const uptimeHtml = stripForUptime(rawHtml);
-    console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
-
-    // Build service name list for the AI to match against
+    // ── PASS 2: Extract uptime bar data deterministically from SVG ──
     const serviceNames = (pass1.services || []).map((s: any) => s.name);
+    const barData = extractBarsFromHtml(rawHtml, serviceNames);
 
-    const pass2 = await callAI(
-      apiKey,
-      `You extract uptime bar data from status page HTML. You are given a list of known service names.
-
-The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
-- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
-- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
-- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
-- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
-- transparent rects are hover overlays — SKIP them entirely
-
-CRITICAL RULES:
-1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
-2. Carefully check each rect's fill color. Do NOT assume all bars are green.
-3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
-4. Count the exact number of visible bar rects per service.
-5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
-6. Also extract "uptime_pct" if a percentage is shown near the service.
-
-Return ONLY valid JSON:
-{
-  "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
-  ]
-}
-Match service names EXACTLY as provided.`,
-      `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-      uptimeHtml
-    );
+    // Use since-value from deterministic extraction
+    const startDate = barData.since_value;
+    console.log("Detected chart start date (since-value):", startDate);
 
     // Log summary of extracted bar data for debugging
-    for (const s of (pass2.services || [])) {
+    for (const s of barData.services) {
       const days = s.uptime_days;
-      if (Array.isArray(days)) {
-        const falseCount = days.filter((d: any) => d === false).length;
-        const nullCount = days.filter((d: any) => d === null).length;
-        console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
-      }
+      const falseCount = days.filter((d) => d === false).length;
+      const nullCount = days.filter((d) => d === null).length;
+      console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
     }
-    console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
+    console.log("Pass 2 (deterministic) found uptime data for", barData.services.length, "services");
 
     // ── Merge passes ──
-    const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
-    for (const s of (pass2.services || [])) {
+    const uptimeMap = new Map<string, { uptime_pct: number | null; uptime_days: (boolean | null)[] }>();
+    for (const s of barData.services) {
       uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
     }
 
