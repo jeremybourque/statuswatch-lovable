@@ -230,6 +230,38 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
   }
 }
 
+async function fetchRenderedHTML(url: string): Promise<string> {
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!firecrawlKey) {
+    throw new Error("Firecrawl is not configured. Connect Firecrawl in project settings to scrape JS-rendered pages.");
+  }
+
+  console.log("Using Firecrawl to render JS page:", url);
+  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${firecrawlKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["html"],
+      waitFor: 5000,
+    }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.text();
+    console.error("Firecrawl error:", errData);
+    throw new Error(`Firecrawl failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const html = data?.data?.html || data?.html || "";
+  console.log("Firecrawl returned HTML length:", html.length);
+  return html;
+}
+
 async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedResult> {
   let rawHtml: string;
   try {
@@ -241,12 +273,18 @@ async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedRes
 
   console.log("Fetched HTML length:", rawHtml.length);
 
-  const servicesHtml = stripForServices(rawHtml);
+  let servicesHtml = stripForServices(rawHtml);
   console.log("Pass 1 (services) stripped HTML length:", servicesHtml.length);
 
-  // If stripped HTML is very small, the page is likely JS-rendered
+  // If stripped HTML is very small, the page is likely JS-rendered — try Firecrawl
   if (servicesHtml.length < 200) {
-    throw new Error("This status page appears to be JavaScript-rendered. The page content could not be extracted with a simple fetch. Try a different status page URL, or one that uses server-side rendering.");
+    console.log("Page appears JS-rendered, trying Firecrawl...");
+    rawHtml = await fetchRenderedHTML(url);
+    servicesHtml = stripForServices(rawHtml);
+    console.log("Firecrawl stripped HTML length:", servicesHtml.length);
+    if (servicesHtml.length < 200) {
+      throw new Error("Could not extract content from this status page, even with JavaScript rendering.");
+    }
   }
 
   const pass1 = await callAI(
