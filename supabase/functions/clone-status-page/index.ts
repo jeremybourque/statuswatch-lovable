@@ -340,6 +340,10 @@ async function fetchRenderedHTML(url: string): Promise<string> {
       url,
       formats: ["html"],
       waitFor: 5000,
+      actions: [
+        { type: "click", selector: "[aria-expanded='false'], .collapsible-header, [data-toggle='collapse'], .component-container.collapsed, button[class*='expand'], summary" },
+        { type: "wait", milliseconds: 3000 },
+      ],
     }),
   });
 
@@ -376,6 +380,10 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
       url,
       formats: ["rawHtml"],
       waitFor: 5000,
+      actions: [
+        { type: "click", selector: "[aria-expanded='false'], .collapsible-header, [data-toggle='collapse'], .component-container.collapsed, button[class*='expand'], summary" },
+        { type: "wait", milliseconds: 3000 },
+      ],
     }),
   });
 
