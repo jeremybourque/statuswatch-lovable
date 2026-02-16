@@ -350,7 +350,8 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
     }
   ]
 }
-uptime_days: array of 90 booleans (true=up, false=down/degraded, null=no data), oldest first.
+uptime_days: array of 90 values (true=up, false=down/degraded, null=no data), oldest first.
+IMPORTANT: If you cannot find uptime bar/chart data for a service, return ALL nulls for that service's uptime_days — do NOT guess or assume days are operational. Only use true/false when the page clearly shows that day's status.
 uptime_pct: the percentage shown near the bar chart, or null if not visible.
 ONLY extract data for these specific services: ${JSON.stringify(batch)}`,
           "Extract uptime bar data for the listed services from this HTML:",
