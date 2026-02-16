@@ -20,6 +20,7 @@ interface ExtractedService {
 interface ExtractedData {
   name: string;
   services: ExtractedService[];
+  start_date: string | null;
 }
 
 function slugify(text: string) {
@@ -257,11 +258,20 @@ const AdminClonePage = () => {
         extracted.services.forEach((s, i) => {
           if (s.uptime_days && s.uptime_days.length > 0 && createdServices?.[i]) {
             const serviceId = createdServices[i].id;
-            const today = new Date();
+            // Use the source page's start date to anchor bars to correct dates
+            let anchorDate: Date;
+            if (extracted.start_date) {
+              const [y, m, d] = extracted.start_date.split("-").map(Number);
+              anchorDate = new Date(y, m - 1, d);
+            } else {
+              // Fallback: assume last bar is today
+              anchorDate = new Date();
+              anchorDate.setDate(anchorDate.getDate() - (s.uptime_days.length - 1));
+            }
             s.uptime_days.forEach((up, dayIdx) => {
-              if (up === null) return; // Skip days with no data
-              const date = new Date(today);
-              date.setDate(date.getDate() - (s.uptime_days!.length - 1 - dayIdx));
+              if (up === null) return;
+              const date = new Date(anchorDate);
+              date.setDate(date.getDate() + dayIdx);
               const year = date.getFullYear();
               const month = String(date.getMonth() + 1).padStart(2, "0");
               const day = String(date.getDate()).padStart(2, "0");
