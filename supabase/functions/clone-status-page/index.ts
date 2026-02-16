@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
 IMPORTANT: Extract ALL services listed on the page, not just the first one. Look for every component/service entry.
 If services are organized into groups/categories, include the group name in each service's "group" field. If a service has no group, set "group" to null.
 CRITICAL: Group/category headers are NOT services. Do NOT include group names as separate service entries. Only include actual services/components that have their own status.
-Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational". For the "name" field, remove any trailing suffixes like "| Status", "Status", "- Status Page", etc. Return just the clean company/product name. IMPORTANT: All service names must be in Title Case (e.g. "Api Gateway" -> "Api Gateway", "VOICE SDK" -> "Voice Sdk", "cloud storage" -> "Cloud Storage"). Normalize any ALL CAPS or lowercase names to Title Case.`,
+Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational". For the "name" field, remove any trailing suffixes like "| Status", "Status", "- Status Page", etc. Return just the clean company/product name.`,
           },
           {
             role: "user",
