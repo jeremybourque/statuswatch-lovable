@@ -123,13 +123,18 @@ export function ServiceList({ services }: { services: Service[] }) {
           return <ServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
         }
         return (
-          <div key={`ungrouped-${i}`} className="space-y-0 border border-border rounded-lg overflow-hidden">
+          <div key={`ungrouped-${i}`} className="space-y-2">
             {section.services.map((service, index) => (
-              <div
-                key={service.id}
-                className={index !== section.services.length - 1 ? "border-b border-border" : ""}
-              >
-                <ServiceCard service={service} />
+              <div key={service.id} className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <StatusDot status={service.status} />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {service.name}
+                  </h3>
+                </div>
+                <span className={`text-xs font-medium ${statusConfig[service.status].colorClass}`}>
+                  {statusConfig[service.status].label}
+                </span>
               </div>
             ))}
           </div>
