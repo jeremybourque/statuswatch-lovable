@@ -340,7 +340,6 @@ async function fetchRenderedHTML(url: string): Promise<string> {
       url,
       formats: ["html"],
       onlyMainContent: false,
-      waitFor: 5000,
     }),
   });
 
@@ -377,7 +376,6 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
       url,
       formats: ["rawHtml"],
       onlyMainContent: false,
-      waitFor: 5000,
     }),
   });
 
