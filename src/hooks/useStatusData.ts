@@ -76,7 +76,7 @@ export function useServices(statusPageId: string | undefined) {
           for (let i = 89; i >= 0; i--) {
             const d = new Date(today);
             d.setDate(d.getDate() - i);
-            const key = d.toISOString().split("T")[0];
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
             days.push(dayMap.has(key) ? dayMap.get(key)! : null);
           }
         }
