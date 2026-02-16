@@ -91,34 +91,50 @@ function ServiceGroup({ groupName, services }: { groupName: string; services: Se
 }
 
 export function ServiceList({ services }: { services: Service[] }) {
-  const groups = new Map<string, Service[]>();
-  services.forEach((s) => {
-    const key = s.group_name || "";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
-  });
-  const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
+  type Section = { type: "group"; name: string; services: Service[] } | { type: "ungrouped"; services: Service[] };
+  const sections: Section[] = [];
+  const groupMap = new Map<string, Service[]>();
+  let currentUngrouped: Service[] | null = null;
+
+  for (const s of services) {
+    if (s.group_name) {
+      currentUngrouped = null;
+      if (!groupMap.has(s.group_name)) {
+        const arr: Service[] = [];
+        groupMap.set(s.group_name, arr);
+        sections.push({ type: "group", name: s.group_name, services: arr });
+      }
+      groupMap.get(s.group_name)!.push(s);
+    } else {
+      if (!currentUngrouped) {
+        currentUngrouped = [];
+        sections.push({ type: "ungrouped", services: currentUngrouped });
+      }
+      currentUngrouped.push(s);
+    }
+  }
+
+  const hasGroups = groupMap.size > 0;
 
   return (
     <div className="space-y-6">
-      {Array.from(groups.entries()).map(([groupName, groupServices]) => (
-        <div key={groupName || "__ungrouped"}>
-          {hasGroups && groupName ? (
-            <ServiceGroup groupName={groupName} services={groupServices} />
-          ) : (
-            <div className="space-y-0 border border-border rounded-lg overflow-hidden">
-              {groupServices.map((service, index) => (
-                <div
-                  key={service.id}
-                  className={index !== groupServices.length - 1 ? "border-b border-border" : ""}
-                >
-                  <ServiceCard service={service} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+      {sections.map((section, i) => {
+        if (section.type === "group") {
+          return <ServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
+        }
+        return (
+          <div key={`ungrouped-${i}`} className="space-y-0 border border-border rounded-lg overflow-hidden">
+            {section.services.map((service, index) => (
+              <div
+                key={service.id}
+                className={index !== section.services.length - 1 ? "border-b border-border" : ""}
+              >
+                <ServiceCard service={service} />
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

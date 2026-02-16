@@ -75,37 +75,40 @@ function ExtractedServiceGroup({ groupName, services }: { groupName: string; ser
 }
 
 function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
-  const groups = new Map<string, ExtractedService[]>();
-  services.forEach((s) => {
-    const key = s.group || "";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
-  });
-  const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
+  // Build ordered sections preserving source order: groups stay together, ungrouped rendered inline
+  type Section = { type: "group"; name: string; services: ExtractedService[] } | { type: "ungrouped"; service: ExtractedService };
+  const sections: Section[] = [];
+  const groupMap = new Map<string, ExtractedService[]>();
+
+  for (const s of services) {
+    if (s.group) {
+      if (!groupMap.has(s.group)) {
+        const arr: ExtractedService[] = [];
+        groupMap.set(s.group, arr);
+        sections.push({ type: "group", name: s.group, services: arr });
+      }
+      groupMap.get(s.group)!.push(s);
+    } else {
+      sections.push({ type: "ungrouped", service: s });
+    }
+  }
 
   return (
     <div className="space-y-3">
       <Label className="text-sm">Services ({services.length})</Label>
-      {Array.from(groups.entries()).map(([groupName, groupServices]) => (
-        <div key={groupName || "__ungrouped"}>
-          {hasGroups && groupName ? (
-            <ExtractedServiceGroup groupName={groupName} services={groupServices} />
-          ) : (
-            <div className="space-y-1.5">
-              {groupServices.map((s, i) => {
-                const config = statusConfig[s.status] ?? statusConfig.operational;
-                return (
-                  <div key={i} className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2">
-                    <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-                    <span className="text-sm text-foreground">{s.name}</span>
-                    <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>{config.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ))}
+      {sections.map((section, i) => {
+        if (section.type === "group") {
+          return <ExtractedServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
+        }
+        const config = statusConfig[section.service.status] ?? statusConfig.operational;
+        return (
+          <div key={`svc-${i}`} className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2">
+            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
+            <span className="text-sm text-foreground">{section.service.name}</span>
+            <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>{config.label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
