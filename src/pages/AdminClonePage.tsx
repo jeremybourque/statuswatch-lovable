@@ -12,6 +12,8 @@ interface ExtractedService {
   name: string;
   status: ServiceStatus;
   group?: string | null;
+  uptime_pct?: number | null;
+  uptime_days?: boolean[] | null;
 }
 
 interface ExtractedData {
@@ -54,8 +56,28 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
         </div>
       </button>
       {expanded && (
-        <div className="px-3 pb-3">
-          <p className="text-xs text-muted-foreground ml-5">No uptime data yet — will be tracked after creation.</p>
+        <div className="px-3 pb-3 ml-5">
+          {service.uptime_days && service.uptime_days.length > 0 ? (
+            <div className="flex items-center gap-1">
+              <div className="flex gap-px flex-1">
+                {service.uptime_days.map((up, i) => (
+                  <div
+                    key={i}
+                    className={`h-6 flex-1 rounded-sm ${up ? "bg-status-operational" : "bg-status-major"}`}
+                  />
+                ))}
+              </div>
+              {service.uptime_pct != null && (
+                <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
+                  {service.uptime_pct}%
+                </span>
+              )}
+            </div>
+          ) : service.uptime_pct != null ? (
+            <p className="text-xs text-muted-foreground">Uptime: {service.uptime_pct}%</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">No uptime data yet — will be tracked after creation.</p>
+          )}
         </div>
       )}
     </div>
@@ -197,9 +219,35 @@ const AdminClonePage = () => {
           group_name: s.group || null,
           status_page_id: page.id,
           display_order: i,
+          uptime: s.uptime_pct ?? 100,
         }));
-        const { error: sErr } = await supabase.from("services").insert(services);
+        const { data: createdServices, error: sErr } = await supabase
+          .from("services")
+          .insert(services)
+          .select("id");
         if (sErr) throw sErr;
+
+        // Insert uptime_days for services that have daily data
+        const uptimeRows: { service_id: string; day: string; up: boolean }[] = [];
+        extracted.services.forEach((s, i) => {
+          if (s.uptime_days && s.uptime_days.length > 0 && createdServices?.[i]) {
+            const serviceId = createdServices[i].id;
+            const today = new Date();
+            s.uptime_days.forEach((up, dayIdx) => {
+              const date = new Date(today);
+              date.setDate(date.getDate() - (s.uptime_days!.length - 1 - dayIdx));
+              uptimeRows.push({
+                service_id: serviceId,
+                day: date.toISOString().split("T")[0],
+                up,
+              });
+            });
+          }
+        });
+        if (uptimeRows.length > 0) {
+          const { error: uErr } = await supabase.from("uptime_days").insert(uptimeRows);
+          if (uErr) console.error("Failed to insert uptime days:", uErr);
+        }
       }
 
       toast({ title: "Status page cloned!" });
