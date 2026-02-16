@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, ArrowLeft, Loader2, Globe, Plus, Check, ChevronDown } from "lucide-react";
+import { Activity, ArrowLeft, Loader2, Globe, Plus, Check, ChevronDown, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,6 +164,45 @@ function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
   );
 }
 
+interface LogEntry {
+  message: string;
+  status: "pending" | "done" | "error";
+  timestamp: Date;
+}
+
+function ActivityLog({ entries }: { entries: LogEntry[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [entries.length]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="border border-border rounded-lg bg-muted/30 overflow-hidden">
+      <div className="px-4 py-2 border-b border-border bg-muted/50">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activity Log</span>
+      </div>
+      <ScrollArea className="max-h-48">
+        <div className="p-3 space-y-1.5">
+          {entries.map((entry, i) => (
+            <div key={i} className="flex items-start gap-2 text-sm">
+              {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />}
+              {entry.status === "pending" && <Loader2 className="h-4 w-4 text-muted-foreground animate-spin mt-0.5 shrink-0" />}
+              {entry.status === "error" && <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
+              <span className={entry.status === "error" ? "text-destructive" : entry.status === "pending" ? "text-muted-foreground" : "text-foreground"}>
+                {entry.message}
+              </span>
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 const AdminClonePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -174,19 +214,64 @@ const AdminClonePage = () => {
   const [slug, setSlug] = useState("");
   const [slugManual, setSlugManual] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+
+  const addLog = (message: string, status: LogEntry["status"] = "pending") => {
+    setLogEntries((prev) => [...prev, { message, status, timestamp: new Date() }]);
+  };
+
+  const completeLastLog = (status: "done" | "error" = "done") => {
+    setLogEntries((prev) => {
+      const updated = [...prev];
+      const lastPending = [...updated].reverse().findIndex((e) => e.status === "pending");
+      if (lastPending >= 0) {
+        updated[updated.length - 1 - lastPending] = { ...updated[updated.length - 1 - lastPending], status };
+      }
+      return updated;
+    });
+  };
 
   const handleFetch = async () => {
     if (!url.trim()) return;
     setFetching(true);
     setExtracted(null);
+    setLogEntries([]);
+
+    addLog("Connecting to status page...");
+
+    // Simulate progress steps with timeouts while the edge function runs
+    const steps = [
+      { delay: 2000, msg: "Checking for structured API..." },
+      { delay: 5000, msg: "Extracting service components..." },
+      { delay: 9000, msg: "Fetching page HTML for uptime history..." },
+      { delay: 14000, msg: "Analyzing uptime bar data with AI..." },
+      { delay: 25000, msg: "Processing results..." },
+    ];
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const step of steps) {
+      timers.push(
+        setTimeout(() => {
+          completeLastLog("done");
+          addLog(step.msg);
+        }, step.delay)
+      );
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke("clone-status-page", {
         body: { url: url.trim() },
       });
 
+      // Clear pending timers
+      timers.forEach(clearTimeout);
+
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Failed to extract data");
+
+      // Mark all remaining as done
+      setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
+      addLog(`Analysis complete — found ${data.data.services?.length ?? 0} services`, "done");
 
       const result = data.data as ExtractedData;
       setExtracted(result);
@@ -198,6 +283,9 @@ const AdminClonePage = () => {
       }
       toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services.` });
     } catch (err: any) {
+      timers.forEach(clearTimeout);
+      setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
+      addLog(err.message || "Analysis failed", "error");
       toast({ title: "Failed to analyze page", description: err.message, variant: "destructive" });
     } finally {
       setFetching(false);
@@ -341,6 +429,8 @@ const AdminClonePage = () => {
           <p className="text-xs text-muted-foreground">
             Paste a public status page URL to extract its services and create a copy.
           </p>
+
+          {logEntries.length > 0 && <ActivityLog entries={logEntries} />}
         </section>
 
         {/* Preview extracted data */}
