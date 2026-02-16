@@ -241,11 +241,16 @@ const AdminClonePage = () => {
 
     // Simulate progress steps with timeouts while the edge function runs
     const steps = [
-      { delay: 2000, msg: "Checking for structured API..." },
-      { delay: 5000, msg: "Extracting service components..." },
-      { delay: 9000, msg: "Fetching page HTML for uptime history..." },
-      { delay: 14000, msg: "Analyzing uptime bar data with AI..." },
-      { delay: 25000, msg: "Processing results..." },
+      { delay: 1500, msg: "Checking for Atlassian Statuspage API (summary.json)..." },
+      { delay: 3500, msg: "Fetching component list and group structure..." },
+      { delay: 6000, msg: "Sorting components by group and display order..." },
+      { delay: 8000, msg: "Downloading page HTML for uptime bar extraction..." },
+      { delay: 10000, msg: "Stripping scripts, styles, and non-essential markup..." },
+      { delay: 12000, msg: "Detecting chart date range (since-value anchor)..." },
+      { delay: 15000, msg: "Sending SVG data to AI for color analysis..." },
+      { delay: 20000, msg: "Mapping rect fill colors → operational / incident / no-data..." },
+      { delay: 26000, msg: "Merging uptime history into service records..." },
+      { delay: 32000, msg: "Finalizing results..." },
     ];
 
     const timers: ReturnType<typeof setTimeout>[] = [];
