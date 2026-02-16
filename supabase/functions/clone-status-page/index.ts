@@ -22,6 +22,126 @@ interface ExtractedResult {
   start_date: string | null;
 }
 
+// ── Color classification for SVG rect fills ──
+
+function classifyColor(fill: string): boolean | null {
+  if (!fill) return null;
+  const f = fill.toLowerCase().trim();
+  // Skip transparent / invisible
+  if (f === "transparent" || f === "none" || f === "rgba(0,0,0,0)" || f === "rgba(0, 0, 0, 0)") return null;
+
+  // Parse hex to RGB
+  let r = 0, g = 0, b = 0;
+  const hexMatch = f.match(/^#([0-9a-f]{3,8})$/);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    if (hex.length >= 6) {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    }
+  }
+  const rgbMatch = f.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    r = parseInt(rgbMatch[1]); g = parseInt(rgbMatch[2]); b = parseInt(rgbMatch[3]);
+  }
+
+  if (!hexMatch && !rgbMatch) return null; // unknown format
+
+  // Green shades (operational): g is dominant
+  if (g > 100 && g > r * 1.2 && g > b * 1.2) return true;
+  // Gray shades (no data): r≈g≈b, all moderate
+  if (Math.abs(r - g) < 30 && Math.abs(g - b) < 30 && r > 80 && r < 220) return null;
+  // Red/orange/yellow (incident): r is high
+  if (r > 150 && r > b) return false;
+  // Fallback: if bright enough and greenish, operational
+  if (g > r && g > b) return true;
+
+  return null;
+}
+
+/**
+ * Parse uptime bars directly from Atlassian Statuspage HTML.
+ * Each component section has an SVG with <rect> elements whose fill colors
+ * indicate daily status. This avoids an expensive AI call.
+ */
+function parseUptimeBarsFromHTML(
+  html: string,
+  serviceNames: string[]
+): Map<string, { uptime_pct: number | null; uptime_days: (boolean | null)[] }> {
+  const result = new Map<string, { uptime_pct: number | null; uptime_days: (boolean | null)[] }>();
+
+  // Find each component-container div which contains the service name and its SVG bar
+  // Atlassian Statuspage structure: <div class="component-container..."> ... <span class="name">ServiceName</span> ... <svg>...<rect fill="..."/></svg> ... <span class="uptime-percent">99.99%</span>
+  const containerRegex = /<div[^>]*class="[^"]*component-container[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*component-container|<div[^>]*class="[^"]*components-section|$)/gi;
+  let containerMatch;
+
+  while ((containerMatch = containerRegex.exec(html)) !== null) {
+    const block = containerMatch[1];
+
+    // Extract service name
+    const nameMatch = block.match(/<span[^>]*class="[^"]*name[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    if (!nameMatch) continue;
+    const rawName = nameMatch[1].replace(/<[^>]+>/g, "").trim();
+
+    // Find the best matching service name
+    const matchedName = serviceNames.find(n => n === rawName) 
+      || serviceNames.find(n => rawName.includes(n) || n.includes(rawName));
+    if (!matchedName) continue;
+
+    // Extract uptime percentage
+    let uptimePct: number | null = null;
+    const pctMatch = block.match(/(\d{1,3}\.\d+)\s*%/);
+    if (pctMatch) uptimePct = parseFloat(pctMatch[1]);
+
+    // Extract SVG rect fill colors (the uptime bar)
+    const days: (boolean | null)[] = [];
+    // Find rects with visible fill, sorted by x position
+    const rects: { x: number; fill: string }[] = [];
+    const rectRegex = /<rect[^>]*>/gi;
+    let rectMatch;
+    while ((rectMatch = rectRegex.exec(block)) !== null) {
+      const tag = rectMatch[0];
+      // Skip if it has fill-opacity="0" or data-html (tooltip overlays)
+      if (/fill-opacity\s*=\s*"0"/i.test(tag)) continue;
+      if (/data-html/i.test(tag)) continue;
+      // Must have a height > 20 (bars are tall, overlays may be full-height but transparent)
+      const heightMatch = tag.match(/height\s*=\s*"(\d+(?:\.\d+)?)"/);
+      const h = heightMatch ? parseFloat(heightMatch[1]) : 0;
+      if (h < 20) continue;
+
+      // Get fill color
+      let fill = "";
+      const fillAttr = tag.match(/fill\s*=\s*"([^"]+)"/i);
+      if (fillAttr) fill = fillAttr[1];
+      // Also check inline style
+      const styleMatch = tag.match(/style\s*=\s*"([^"]+)"/i);
+      if (styleMatch) {
+        const styleFill = styleMatch[1].match(/fill\s*:\s*([^;]+)/i);
+        if (styleFill) fill = styleFill[1].trim();
+      }
+      if (!fill || fill === "transparent" || fill === "none") continue;
+
+      const xMatch = tag.match(/\bx\s*=\s*"(\d+(?:\.\d+)?)"/);
+      const x = xMatch ? parseFloat(xMatch[1]) : 0;
+      rects.push({ x, fill });
+    }
+
+    // Sort by x position (left to right = oldest to newest)
+    rects.sort((a, b) => a.x - b.x);
+    for (const rect of rects) {
+      days.push(classifyColor(rect.fill));
+    }
+
+    if (days.length > 0) {
+      result.set(matchedName, { uptime_pct: uptimePct, uptime_days: days });
+    }
+  }
+
+  return result;
+}
+
 // ── Atlassian Statuspage API approach ──
 
 function mapStatuspageStatus(status: string): ServiceStatus {
@@ -81,92 +201,33 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
 
     console.log(`Statuspage API found ${services.length} components`);
 
-    // Scrape the HTML page to extract uptime bar data from SVGs
+    // Scrape the HTML page to extract uptime bar data from SVGs — programmatically, no AI needed
     let startDate: string | null = null;
     try {
-      const apiKey = Deno.env.get("LOVABLE_API_KEY");
-      if (apiKey) {
-        const pageRes = await fetch(origin, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
-        });
-        let rawHtml = await pageRes.text();
-        console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
+      const pageRes = await fetch(origin, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
+      });
+      const rawHtml = await pageRes.text();
+      console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
-        // Extract chart date range
-        const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-        startDate = sinceMatch ? sinceMatch[1] : null;
-        console.log("Detected chart start date:", startDate);
+      // Extract chart date range
+      const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+      startDate = sinceMatch ? sinceMatch[1] : null;
+      console.log("Detected chart start date:", startDate);
 
-        // Strip HTML but keep SVG data
-        const uptimeHtml = rawHtml
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-          .replace(/<head[\s\S]*?<\/head>/gi, "")
-          .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-          .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-          .replace(/<!--[\s\S]*?-->/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><");
+      // Parse uptime bars directly from SVG rects — no AI call needed
+      const uptimeData = parseUptimeBarsFromHTML(rawHtml, services.map(s => s.name));
 
-        console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
-
-        const serviceNames = services.map(s => s.name);
-
-        const pass2 = await callAI(
-          apiKey,
-          `You extract uptime bar data from status page HTML. You are given a list of known service names.
-
-The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
-- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
-- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
-- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
-- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
-- transparent rects are hover overlays — SKIP them entirely
-
-CRITICAL RULES:
-1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
-2. Carefully check each rect's fill color. Do NOT assume all bars are green.
-3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
-4. Count the exact number of visible bar rects per service.
-5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
-6. Also extract "uptime_pct" if a percentage is shown near the service.
-
-Return ONLY valid JSON:
-{
-  "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
-  ]
-}
-Match service names EXACTLY as provided.`,
-          `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-          uptimeHtml
-        );
-
-        // Merge uptime data into services
-        const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
-        for (const s of (pass2.services || [])) {
-          uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+      for (const svc of services) {
+        const uptime = uptimeData.get(svc.name);
+        if (uptime) {
+          svc.uptime_pct = uptime.uptime_pct ?? null;
+          svc.uptime_days = uptime.uptime_days ?? null;
         }
-
-        for (const svc of services) {
-          const uptime = uptimeMap.get(svc.name);
-          if (uptime) {
-            svc.uptime_pct = uptime.uptime_pct ?? null;
-            svc.uptime_days = uptime.uptime_days ?? null;
-          }
-        }
-
-        for (const s of (pass2.services || [])) {
-          const days = s.uptime_days;
-          if (Array.isArray(days)) {
-            const falseCount = days.filter((d: any) => d === false).length;
-            const nullCount = days.filter((d: any) => d === null).length;
-            console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
-          }
-        }
-        console.log("Extracted uptime data from HTML scraping");
       }
+
+      const matched = [...uptimeData.entries()].filter(([_, v]) => v.uptime_days && v.uptime_days.length > 0).length;
+      console.log(`Parsed uptime bars for ${matched}/${services.length} services`);
     } catch (e: any) {
       console.log("Could not scrape uptime bars:", e.message);
     }
