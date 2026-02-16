@@ -231,12 +231,19 @@ Match service names EXACTLY as provided. Only include services from the provided
 
     const mergedServices = (pass1.services || []).map((s: any) => {
       const uptime = uptimeMap.get(s.name);
+      let days: (boolean | null)[] = uptime?.uptime_days ?? [];
+      // Always ensure exactly 90 days, padding with null (no data) on the left
+      if (days.length < 90) {
+        days = [...Array(90 - days.length).fill(null), ...days];
+      } else if (days.length > 90) {
+        days = days.slice(days.length - 90);
+      }
       return {
         name: s.name,
         status: s.status,
         group: s.group,
         uptime_pct: uptime?.uptime_pct ?? null,
-        uptime_days: uptime?.uptime_days ?? null,
+        uptime_days: days,
       };
     });
 
