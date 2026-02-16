@@ -57,27 +57,24 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
       </button>
       {expanded && (
         <div className="px-3 pb-3 ml-5">
-          {service.uptime_days && service.uptime_days.length > 0 ? (
-            <div className="flex items-center gap-1">
-              <div className="flex gap-px flex-1">
-                {service.uptime_days.map((up, i) => (
-                  <div
-                    key={i}
-                    className={`h-6 flex-1 rounded-sm ${up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"}`}
-                  />
-                ))}
-              </div>
-              {service.uptime_pct != null && (
-                <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
-                  {service.uptime_pct}%
-                </span>
-              )}
+          <div className="flex items-center gap-1">
+            <div className="flex gap-px flex-1">
+              {(service.uptime_days && service.uptime_days.length > 0
+                ? service.uptime_days
+                : Array(90).fill(null)
+              ).map((up, i) => (
+                <div
+                  key={i}
+                  className={`h-6 flex-1 rounded-sm ${up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"}`}
+                />
+              ))}
             </div>
-          ) : service.uptime_pct != null ? (
-            <p className="text-xs text-muted-foreground">Uptime: {service.uptime_pct}%</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">No uptime data yet — will be tracked after creation.</p>
-          )}
+            {service.uptime_pct != null && (
+              <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
+                {service.uptime_pct}%
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
