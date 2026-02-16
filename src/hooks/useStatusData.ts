@@ -68,16 +68,27 @@ export function useServices(statusPageId: string | undefined) {
         uptimeMap.get(row.service_id)!.set(row.day, row.up);
       }
 
+      // Find the global date range across all services
+      let globalMin: string | null = null;
+      let globalMax: string | null = null;
+      for (const [, dayMap] of uptimeMap) {
+        for (const key of dayMap.keys()) {
+          if (!globalMin || key < globalMin) globalMin = key;
+          if (!globalMax || key > globalMax) globalMax = key;
+        }
+      }
+
       return (services ?? []).map((s) => {
         const dayMap = uptimeMap.get(s.id);
         let days: (boolean | null)[] = [];
-        if (dayMap && dayMap.size > 0) {
-          const today = new Date();
-          for (let i = 89; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(d.getDate() - i);
+        if (globalMin && globalMax) {
+          const [sy, sm, sd] = globalMin.split("-").map(Number);
+          const [ey, em, ed] = globalMax.split("-").map(Number);
+          const start = new Date(sy, sm - 1, sd);
+          const end = new Date(ey, em - 1, ed);
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-            days.push(dayMap.has(key) ? dayMap.get(key)! : null);
+            days.push(dayMap?.has(key) ? dayMap.get(key)! : null);
           }
         }
         return {
