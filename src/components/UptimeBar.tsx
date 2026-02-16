@@ -11,7 +11,7 @@ export function UptimeBar({ days }: UptimeBarProps) {
         <Tooltip key={i}>
           <TooltipTrigger asChild>
             <div
-              className={`w-[3px] h-6 rounded-sm transition-colors ${
+              className={`flex-1 min-w-[4px] h-6 rounded-sm transition-colors ${
                 up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"
               } hover:opacity-80`}
             />
