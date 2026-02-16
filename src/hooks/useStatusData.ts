@@ -62,20 +62,33 @@ export function useServices(statusPageId: string | undefined) {
         .order("day", { ascending: true });
       if (uErr) throw uErr;
 
-      const uptimeMap = new Map<string, boolean[]>();
+      const uptimeMap = new Map<string, Map<string, boolean>>();
       for (const row of uptimeDays ?? []) {
-        if (!uptimeMap.has(row.service_id)) uptimeMap.set(row.service_id, []);
-        uptimeMap.get(row.service_id)!.push(row.up);
+        if (!uptimeMap.has(row.service_id)) uptimeMap.set(row.service_id, new Map());
+        uptimeMap.get(row.service_id)!.set(row.day, row.up);
       }
 
-      return (services ?? []).map((s) => ({
-        id: s.id,
-        name: s.name,
-        status: s.status as ServiceStatus,
-        uptime: Number(s.uptime),
-        uptimeDays: uptimeMap.get(s.id) ?? [],
-        group_name: s.group_name,
-      }));
+      return (services ?? []).map((s) => {
+        const dayMap = uptimeMap.get(s.id);
+        let days: (boolean | null)[] = [];
+        if (dayMap && dayMap.size > 0) {
+          const today = new Date();
+          for (let i = 89; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().split("T")[0];
+            days.push(dayMap.has(key) ? dayMap.get(key)! : null);
+          }
+        }
+        return {
+          id: s.id,
+          name: s.name,
+          status: s.status as ServiceStatus,
+          uptime: Number(s.uptime),
+          uptimeDays: days,
+          group_name: s.group_name,
+        };
+      });
     },
   });
 }

@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UptimeBarProps {
-  days: boolean[];
+  days: (boolean | null)[];
 }
 
 export function UptimeBar({ days }: UptimeBarProps) {
@@ -12,12 +12,12 @@ export function UptimeBar({ days }: UptimeBarProps) {
           <TooltipTrigger asChild>
             <div
               className={`w-[3px] h-6 rounded-sm transition-colors ${
-                up ? "bg-status-operational" : "bg-status-major"
+                up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"
               } hover:opacity-80`}
             />
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
-            {90 - i} days ago — {up ? "No downtime" : "Downtime recorded"}
+            {90 - i} days ago — {up === null ? "No data" : up ? "No downtime" : "Downtime recorded"}
           </TooltipContent>
         </Tooltip>
       ))}
