@@ -184,7 +184,11 @@ const AdminClonePage = () => {
       const result = data.data as ExtractedData;
       setExtracted(result);
       setName(result.name || "");
-      if (!slugManual) setSlug(slugify(result.name || ""));
+      if (!slugManual) {
+        const baseSlug = slugify(result.name || "");
+        const uniqueSlug = await findUniqueSlug(baseSlug);
+        setSlug(uniqueSlug);
+      }
       toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services.` });
     } catch (err: any) {
       toast({ title: "Failed to analyze page", description: err.message, variant: "destructive" });
@@ -192,6 +196,21 @@ const AdminClonePage = () => {
       setFetching(false);
     }
   };
+
+  async function findUniqueSlug(base: string): Promise<string> {
+    let candidate = base;
+    let suffix = 2;
+    while (true) {
+      const { data } = await supabase
+        .from("status_pages")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!data) return candidate;
+      candidate = `${base}-${suffix}`;
+      suffix++;
+    }
+  }
 
   const handleNameChange = (val: string) => {
     setName(val);
