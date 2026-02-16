@@ -102,10 +102,12 @@ function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
         }
         const config = statusConfig[section.service.status] ?? statusConfig.operational;
         return (
-          <div key={`svc-${i}`} className="flex items-center justify-between px-1 py-1.5">
+          <div key={`svc-${i}`} className="w-full flex items-center justify-between group">
             <div className="flex items-center gap-2">
               <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-              <span className="text-sm text-foreground">{section.service.name}</span>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {section.service.name}
+              </p>
             </div>
             <span className={`text-xs font-medium ${config.colorClass}`}>{config.label}</span>
           </div>
