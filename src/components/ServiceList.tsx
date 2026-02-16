@@ -53,7 +53,7 @@ export function ServiceList({ services }: { services: Service[] }) {
   // Group services by group_name
   const groups = new Map<string, Service[]>();
   services.forEach((s) => {
-    const key = (s as any).group_name || "";
+    const key = s.group_name || "";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(s);
   });

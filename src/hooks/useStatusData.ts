@@ -74,6 +74,7 @@ export function useServices(statusPageId: string | undefined) {
         status: s.status as ServiceStatus,
         uptime: Number(s.uptime),
         uptimeDays: uptimeMap.get(s.id) ?? [],
+        group_name: s.group_name,
       }));
     },
   });
