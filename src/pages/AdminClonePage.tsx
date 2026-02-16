@@ -237,48 +237,68 @@ const AdminClonePage = () => {
     setExtracted(null);
     setLogEntries([]);
 
-    addLog("Connecting to status page...");
-
-    // Simulate progress steps with timeouts while the edge function runs
-    const steps = [
-      { delay: 1500, msg: "Checking for Atlassian Statuspage API (summary.json)..." },
-      { delay: 3500, msg: "Fetching component list and group structure..." },
-      { delay: 6000, msg: "Sorting components by group and display order..." },
-      { delay: 8000, msg: "Downloading page HTML for uptime bar extraction..." },
-      { delay: 10000, msg: "Stripping scripts, styles, and non-essential markup..." },
-      { delay: 12000, msg: "Detecting chart date range (since-value anchor)..." },
-      { delay: 15000, msg: "Sending SVG data to AI for color analysis..." },
-      { delay: 20000, msg: "Mapping rect fill colors → operational / incident / no-data..." },
-      { delay: 26000, msg: "Merging uptime history into service records..." },
-      { delay: 32000, msg: "Finalizing results..." },
-    ];
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    for (const step of steps) {
-      timers.push(
-        setTimeout(() => {
-          completeLastLog("done");
-          addLog(step.msg);
-        }, step.delay)
-      );
-    }
+    addLog("Starting analysis...");
 
     try {
-      const { data, error } = await supabase.functions.invoke("clone-status-page", {
-        body: { url: url.trim() },
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/clone-status-page`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ url: url.trim() }),
       });
 
-      // Clear pending timers
-      timers.forEach(clearTimeout);
+      if (!response.ok || !response.body) {
+        throw new Error(`Request failed (${response.status})`);
+      }
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Failed to extract data");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let result: ExtractedData | null = null;
 
-      // Mark all remaining as done
-      setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
-      addLog(`Analysis complete — found ${data.data.services?.length ?? 0} services`, "done");
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      const result = data.data as ExtractedData;
+        buffer += decoder.decode(value, { stream: true });
+
+        let newlineIdx: number;
+        while ((newlineIdx = buffer.indexOf("\n\n")) !== -1) {
+          const chunk = buffer.slice(0, newlineIdx).trim();
+          buffer = buffer.slice(newlineIdx + 2);
+
+          if (!chunk.startsWith("data: ")) continue;
+          const jsonStr = chunk.slice(6);
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "progress") {
+              completeLastLog("done");
+              addLog(event.message);
+            } else if (event.type === "result" && event.success) {
+              result = event.data as ExtractedData;
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message && !parseErr.message.includes("JSON")) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+
+      // Mark last pending as done
+      completeLastLog("done");
+
+      if (!result) throw new Error("No result received from analysis");
+
       setExtracted(result);
       setName(result.name || "");
       if (!slugManual) {
@@ -288,7 +308,6 @@ const AdminClonePage = () => {
       }
       toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services.` });
     } catch (err: any) {
-      timers.forEach(clearTimeout);
       setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
       addLog(err.message || "Analysis failed", "error");
       toast({ title: "Failed to analyze page", description: err.message, variant: "destructive" });

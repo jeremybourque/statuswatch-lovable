@@ -22,6 +22,8 @@ interface ExtractedResult {
   start_date: string | null;
 }
 
+type ProgressFn = (msg: string) => void;
+
 // ── Atlassian Statuspage API approach ──
 
 function mapStatuspageStatus(status: string): ServiceStatus {
@@ -35,11 +37,11 @@ function mapStatuspageStatus(status: string): ServiceStatus {
   }
 }
 
-async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null> {
+async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<ExtractedResult | null> {
   const origin = new URL(baseUrl).origin;
 
-  // Try the Atlassian Statuspage v2 API
   try {
+    progress("Checking for Atlassian Statuspage API...");
     const summaryRes = await fetch(`${origin}/api/v2/summary.json`, {
       headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
     });
@@ -50,20 +52,19 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
 
     const pageName = summary.page?.name || "Status Page";
 
-    // Build group info map (id -> { name, position })
+    progress("Parsing component list and group structure...");
+
     const groupInfoMap = new Map<string, { name: string; position: number }>();
     const childComponents: any[] = [];
 
     for (const c of summary.components) {
       if (c.group) {
-        // This IS a group header
         groupInfoMap.set(c.id, { name: c.name, position: c.position ?? 0 });
       } else if (c.name !== pageName) {
         childComponents.push(c);
       }
     }
 
-    // Sort: group position first (ungrouped use their own position), then component position within group
     childComponents.sort((a: any, b: any) => {
       const aGroupPos = a.group_id ? (groupInfoMap.get(a.group_id)?.position ?? 0) : (a.position ?? 0);
       const bGroupPos = b.group_id ? (groupInfoMap.get(b.group_id)?.position ?? 0) : (b.position ?? 0);
@@ -79,25 +80,25 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
       uptime_days: null,
     }));
 
-    console.log(`Statuspage API found ${services.length} components`);
+    progress(`Found ${services.length} components via API`);
 
     // Scrape the HTML page to extract uptime bar data from SVGs
     let startDate: string | null = null;
     try {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (apiKey) {
+        progress("Downloading page HTML for uptime bar extraction...");
         const pageRes = await fetch(origin, {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
         });
         let rawHtml = await pageRes.text();
         console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
-        // Extract chart date range
         const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
         startDate = sinceMatch ? sinceMatch[1] : null;
-        console.log("Detected chart start date:", startDate);
+        progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
 
-        // Strip HTML but keep SVG data
+        progress("Stripping non-essential markup, keeping SVG data...");
         const uptimeHtml = rawHtml
           .replace(/<script[\s\S]*?<\/script>/gi, "")
           .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -111,6 +112,7 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
 
         console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
+        progress("Sending SVG data to AI for color analysis...");
         const serviceNames = services.map(s => s.name);
 
         const pass2 = await callAI(
@@ -143,10 +145,13 @@ Match service names EXACTLY as provided.`,
           uptimeHtml
         );
 
-        // Merge uptime data into services
+        progress("Mapping rect fill colors → operational / incident / no-data...");
+
         const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
+        let matchedCount = 0;
         for (const s of (pass2.services || [])) {
           uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+          if (Array.isArray(s.uptime_days) && s.uptime_days.length > 0) matchedCount++;
         }
 
         for (const svc of services) {
@@ -157,6 +162,8 @@ Match service names EXACTLY as provided.`,
           }
         }
 
+        progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
+
         for (const s of (pass2.services || [])) {
           const days = s.uptime_days;
           if (Array.isArray(days)) {
@@ -165,9 +172,9 @@ Match service names EXACTLY as provided.`,
             console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
           }
         }
-        console.log("Extracted uptime data from HTML scraping");
       }
     } catch (e: any) {
+      progress(`Could not scrape uptime bars: ${e.message}`);
       console.log("Could not scrape uptime bars:", e.message);
     }
 
@@ -217,7 +224,6 @@ async function fetchWithRetries(url: string): Promise<Response> {
   throw new Error("All fetch attempts were blocked by the target site. Try a different URL.");
 }
 
-/** Aggressive strip for service/group extraction */
 function stripForServices(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -235,7 +241,6 @@ function stripForServices(html: string): string {
     .replace(/>\s+</g, "><");
 }
 
-/** Lighter strip for uptime bar data */
 function stripForUptime(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -339,7 +344,8 @@ async function fetchRenderedHTML(url: string): Promise<string> {
   return html;
 }
 
-async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedResult> {
+async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn): Promise<ExtractedResult> {
+  progress("Fetching page HTML...");
   let rawHtml: string;
   try {
     const pageRes = await fetchWithRetries(url);
@@ -350,12 +356,12 @@ async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedRes
 
   console.log("Fetched HTML length:", rawHtml.length);
 
+  progress("Stripping non-essential markup for service extraction...");
   let servicesHtml = stripForServices(rawHtml);
   console.log("Pass 1 (services) stripped HTML length:", servicesHtml.length);
 
-  // If stripped HTML is very small, the page is likely JS-rendered — try Firecrawl
   if (servicesHtml.length < 200) {
-    console.log("Page appears JS-rendered, trying Firecrawl...");
+    progress("Page appears JS-rendered, using Firecrawl...");
     rawHtml = await fetchRenderedHTML(url);
     servicesHtml = stripForServices(rawHtml);
     console.log("Firecrawl stripped HTML length:", servicesHtml.length);
@@ -364,6 +370,7 @@ async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedRes
     }
   }
 
+  progress("Sending HTML to AI for service extraction...");
   const pass1 = await callAI(
     apiKey,
     `You extract status page data from HTML. Return ONLY valid JSON with this structure:
@@ -382,19 +389,19 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
     servicesHtml
   );
 
-  console.log("Pass 1 found", pass1.services?.length ?? 0, "services");
+  progress(`AI found ${pass1.services?.length ?? 0} services`);
 
-  // Extract chart date range
   const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
   const startDate = sinceMatch ? sinceMatch[1] : null;
-  console.log("Detected chart start date:", startDate);
+  progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found");
 
-  // Pass 2: uptime bars
+  progress("Preparing HTML for uptime bar extraction...");
   const uptimeHtml = stripForUptime(rawHtml);
   console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
 
   const serviceNames = (pass1.services || []).map((s: any) => s.name);
 
+  progress("Sending SVG data to AI for uptime color analysis...");
   const pass2 = await callAI(
     apiKey,
     `You extract uptime bar data from status page HTML. You are given a list of known service names.
@@ -425,6 +432,8 @@ Match service names EXACTLY as provided.`,
     uptimeHtml
   );
 
+  progress("Merging uptime history into service records...");
+
   for (const s of (pass2.services || [])) {
     const days = s.uptime_days;
     if (Array.isArray(days)) {
@@ -435,7 +444,6 @@ Match service names EXACTLY as provided.`,
   }
   console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
 
-  // Merge passes
   const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
   for (const s of (pass2.services || [])) {
     uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
@@ -444,7 +452,6 @@ Match service names EXACTLY as provided.`,
   const mergedServices: ExtractedService[] = (pass1.services || []).map((s: any) => {
     const uptime = uptimeMap.get(s.name);
     const days: (boolean | null)[] = uptime?.uptime_days ?? [];
-    // Preserve the actual number of bars from the source — no padding/trimming
     return {
       name: s.name,
       status: s.status,
@@ -453,6 +460,12 @@ Match service names EXACTLY as provided.`,
       uptime_days: days,
     };
   });
+
+  let matchedCount = 0;
+  for (const s of mergedServices) {
+    if (s.uptime_days && s.uptime_days.length > 0) matchedCount++;
+  }
+  progress(`Parsed uptime bars for ${matchedCount}/${mergedServices.length} services`);
 
   return { name: pass1.name, services: mergedServices, start_date: startDate };
 }
@@ -479,29 +492,53 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Fetching URL:", url);
+    // SSE streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendEvent = (type: string, data: any) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, ...data })}\n\n`));
+        };
 
-    // Strategy 1: Try Atlassian Statuspage API (works for JS-rendered pages too)
-    let result: ExtractedResult | null = null;
-    try {
-      result = await tryStatuspageAPI(url);
-      if (result) {
-        console.log("Successfully extracted via Statuspage API");
-      }
-    } catch (e) {
-      console.log("Statuspage API attempt failed:", e.message);
-    }
+        const progress: ProgressFn = (msg: string) => {
+          console.log(msg);
+          sendEvent("progress", { message: msg });
+        };
 
-    // Strategy 2: Fall back to HTML scraping with AI
-    if (!result) {
-      console.log("Falling back to HTML scraping...");
-      result = await extractViaHTML(url, apiKey);
-    }
+        try {
+          progress(`Connecting to ${new URL(url).hostname}...`);
 
-    return new Response(
-      JSON.stringify({ success: true, data: result }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+          let result: ExtractedResult | null = null;
+          try {
+            result = await tryStatuspageAPI(url, progress);
+          } catch (e) {
+            progress(`Statuspage API attempt failed: ${e.message}`);
+          }
+
+          if (!result) {
+            progress("Falling back to HTML scraping with AI...");
+            result = await extractViaHTML(url, apiKey, progress);
+          }
+
+          progress(`Analysis complete — found ${result.services?.length ?? 0} services`);
+          sendEvent("result", { success: true, data: result });
+        } catch (error: any) {
+          console.error("Error:", error);
+          sendEvent("error", { message: error.message });
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (error: any) {
     console.error("Error:", error);
     return new Response(
