@@ -45,21 +45,19 @@ async function fetchWithRetries(url: string): Promise<Response> {
 }
 
 function stripHtml(html: string): string {
-  // Remove script, style, svg, noscript, head tags and their contents
+  // Remove script, style, noscript, head tags and their contents
+  // NOTE: Keep SVGs — they often encode uptime bar data
   let cleaned = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, "")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
     .replace(/<head[\s\S]*?<\/head>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
     // Remove HTML comments
     .replace(/<!--[\s\S]*?-->/g, "")
-    // Remove data attributes and long attribute values to save tokens
-    .replace(/\s+data-[\w-]+="[^"]*"/g, "")
+    // Remove style attributes but keep class and data attributes (they encode status info for uptime bars)
     .replace(/\s+style="[^"]*"/g, "")
-    .replace(/\s+class="[^"]*"/g, " ")
     // Collapse whitespace
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
@@ -169,11 +167,27 @@ If the page shows a daily uptime bar/chart (colored bars indicating up/down for 
     try {
       parsed = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", content);
-      return new Response(
-        JSON.stringify({ success: false, error: "Could not parse status page data" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Attempt to repair truncated JSON
+      try {
+        let repaired = jsonStr;
+        let braces = 0, brackets = 0;
+        for (const char of repaired) {
+          if (char === '{') braces++;
+          if (char === '}') braces--;
+          if (char === '[') brackets++;
+          if (char === ']') brackets--;
+        }
+        while (brackets > 0) { repaired += ']'; brackets--; }
+        while (braces > 0) { repaired += '}'; braces--; }
+        parsed = JSON.parse(repaired);
+        console.warn("Repaired truncated JSON response");
+      } catch {
+        console.error("Failed to parse AI response:", content);
+        return new Response(
+          JSON.stringify({ success: false, error: "Could not parse status page data" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     return new Response(
