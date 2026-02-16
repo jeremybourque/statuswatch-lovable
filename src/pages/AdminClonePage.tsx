@@ -199,7 +199,7 @@ const AdminClonePage = () => {
 
   async function findUniqueSlug(base: string): Promise<string> {
     let candidate = base;
-    let suffix = 2;
+    let suffix = 1;
     while (true) {
       const { data } = await supabase
         .from("status_pages")
