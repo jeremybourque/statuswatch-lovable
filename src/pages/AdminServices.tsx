@@ -17,6 +17,7 @@ interface ServiceRow {
   status: string;
   uptime: number;
   display_order: number;
+  group_name: string | null;
 }
 
 const STATUS_OPTIONS: { value: ServiceStatus; label: string }[] = [
@@ -34,7 +35,7 @@ function useAdminServices(pageId: string | undefined) {
     queryFn: async (): Promise<ServiceRow[]> => {
       const { data, error } = await supabase
         .from("services")
-        .select("id, name, status, uptime, display_order")
+        .select("id, name, status, uptime, display_order, group_name")
         .eq("status_page_id", pageId!)
         .order("display_order");
       if (error) throw error;
@@ -54,6 +55,7 @@ function EditableService({
   const [editName, setEditName] = useState(service.name);
   const [editStatus, setEditStatus] = useState(service.status);
   const [editUptime, setEditUptime] = useState(String(service.uptime));
+  const [editGroup, setEditGroup] = useState(service.group_name ?? "");
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,6 +64,7 @@ function EditableService({
     setEditName(service.name);
     setEditStatus(service.status);
     setEditUptime(String(service.uptime));
+    setEditGroup(service.group_name ?? "");
     setEditing(true);
   };
 
@@ -78,7 +81,7 @@ function EditableService({
     setSaving(true);
     const { error } = await supabase
       .from("services")
-      .update({ name: editName.trim(), status: editStatus, uptime: uptimeNum })
+      .update({ name: editName.trim(), status: editStatus, uptime: uptimeNum, group_name: editGroup.trim() || null })
       .eq("id", service.id);
     setSaving(false);
     if (error) {
@@ -122,10 +125,14 @@ function EditableService({
 
   return (
     <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs">Name</Label>
           <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Group (optional)</Label>
+          <Input placeholder="e.g. Infrastructure" value={editGroup} onChange={(e) => setEditGroup(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Status</Label>
@@ -170,6 +177,7 @@ const AdminServices = () => {
 
   const [addingName, setAddingName] = useState("");
   const [addingStatus, setAddingStatus] = useState<string>("operational");
+  const [addingGroup, setAddingGroup] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -182,6 +190,7 @@ const AdminServices = () => {
       status: addingStatus,
       status_page_id: page.id,
       display_order: nextOrder,
+      group_name: addingGroup.trim() || null,
     });
     setCreating(false);
     if (error) {
@@ -191,6 +200,7 @@ const AdminServices = () => {
     toast({ title: "Service added!" });
     setAddingName("");
     setAddingStatus("operational");
+    setAddingGroup("");
     setShowAddForm(false);
     queryClient.invalidateQueries({ queryKey: ["admin-services", page.id] });
   };
@@ -249,6 +259,14 @@ const AdminServices = () => {
                   value={addingName}
                   onChange={(e) => setAddingName(e.target.value)}
                   autoFocus
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Group (optional)</Label>
+                <Input
+                  placeholder="e.g. Infrastructure"
+                  value={addingGroup}
+                  onChange={(e) => setAddingGroup(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
