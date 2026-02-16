@@ -1,9 +1,9 @@
-import { type Service, statusConfig } from "@/lib/statusData";
+import { type Service, type ServiceStatus, statusConfig, getOverallStatus } from "@/lib/statusData";
 import { UptimeBar } from "./UptimeBar";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-function StatusDot({ status }: { status: Service["status"] }) {
+function StatusDot({ status }: { status: ServiceStatus }) {
   const config = statusConfig[status];
   return (
     <span className="relative flex h-3 w-3">
@@ -49,8 +49,48 @@ function ServiceCard({ service }: { service: Service }) {
   );
 }
 
+function ServiceGroup({ groupName, services }: { groupName: string; services: Service[] }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const groupStatus = getOverallStatus(services);
+
+  return (
+    <div>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between mb-2 group cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <StatusDot status={groupStatus} />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            {groupName}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
+            {statusConfig[groupStatus].label}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          />
+        </div>
+      </button>
+      {!collapsed && (
+        <div className="space-y-0 border border-border rounded-lg overflow-hidden">
+          {services.map((service, index) => (
+            <div
+              key={service.id}
+              className={index !== services.length - 1 ? "border-b border-border" : ""}
+            >
+              <ServiceCard service={service} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ServiceList({ services }: { services: Service[] }) {
-  // Group services by group_name
   const groups = new Map<string, Service[]>();
   services.forEach((s) => {
     const key = s.group_name || "";
@@ -63,21 +103,20 @@ export function ServiceList({ services }: { services: Service[] }) {
     <div className="space-y-6">
       {Array.from(groups.entries()).map(([groupName, groupServices]) => (
         <div key={groupName || "__ungrouped"}>
-          {hasGroups && (
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              {groupName || "Other"}
-            </h3>
+          {hasGroups && groupName ? (
+            <ServiceGroup groupName={groupName} services={groupServices} />
+          ) : (
+            <div className="space-y-0 border border-border rounded-lg overflow-hidden">
+              {groupServices.map((service, index) => (
+                <div
+                  key={service.id}
+                  className={index !== groupServices.length - 1 ? "border-b border-border" : ""}
+                >
+                  <ServiceCard service={service} />
+                </div>
+              ))}
+            </div>
           )}
-          <div className="space-y-0 border border-border rounded-lg overflow-hidden">
-            {groupServices.map((service, index) => (
-              <div
-                key={service.id}
-                className={index !== groupServices.length - 1 ? "border-b border-border" : ""}
-              >
-                <ServiceCard service={service} />
-              </div>
-            ))}
-          </div>
         </div>
       ))}
     </div>
