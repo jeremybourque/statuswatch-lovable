@@ -81,88 +81,97 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
 
     console.log(`Statuspage API found ${services.length} components`);
 
-    // Build component id -> service index map
-    const componentIdToIdx = new Map<string, number>();
-    childComponents.forEach((c: any, idx: number) => {
-      componentIdToIdx.set(c.id, idx);
-    });
-
-    // Reconstruct uptime history from incidents API (90 days)
-    const numDays = 90;
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - (numDays - 1));
-
-    // Initialize uptime_days: all true (operational) by default
-    for (const svc of services) {
-      svc.uptime_days = Array(numDays).fill(true);
-    }
-
+    // Scrape the HTML page to extract uptime bar data from SVGs
+    let startDate: string | null = null;
     try {
-      let page = 1;
-      let hasMore = true;
-      const cutoffDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-
-      while (hasMore && page <= 5) {
-        const incRes = await fetch(`${origin}/api/v2/incidents.json?page=${page}&per_page=100`, {
-          headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      const apiKey = Deno.env.get("LOVABLE_API_KEY");
+      if (apiKey) {
+        const pageRes = await fetch(origin, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
         });
-        if (!incRes.ok) break;
-        const incData = await incRes.json();
-        const incidents = incData?.incidents || [];
-        if (incidents.length === 0) break;
+        let rawHtml = await pageRes.text();
+        console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
-        for (const inc of incidents) {
-          const incCreated = (inc.created_at || "").slice(0, 10);
-          const incResolved = inc.resolved_at ? inc.resolved_at.slice(0, 10) : today.toISOString().slice(0, 10);
+        // Extract chart date range
+        const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+        startDate = sinceMatch ? sinceMatch[1] : null;
+        console.log("Detected chart start date:", startDate);
 
-          if (incResolved < cutoffDate) {
-            hasMore = false;
-            break;
-          }
+        // Strip HTML but keep SVG data
+        const uptimeHtml = rawHtml
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+          .replace(/<head[\s\S]*?<\/head>/gi, "")
+          .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+          .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/\s{2,}/g, " ")
+          .replace(/>\s+</g, "><");
 
-          const affectedIds = new Set<string>();
-          for (const comp of (inc.components || [])) {
-            affectedIds.add(comp.id);
-          }
+        console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
-          for (const compId of affectedIds) {
-            const svcIdx = componentIdToIdx.get(compId);
-            if (svcIdx === undefined) continue;
+        const serviceNames = services.map(s => s.name);
 
-            const incStart = new Date(Math.max(new Date(incCreated).getTime(), startDate.getTime()));
-            const incEnd = new Date(Math.min(new Date(incResolved).getTime(), today.getTime()));
+        const pass2 = await callAI(
+          apiKey,
+          `You extract uptime bar data from status page HTML. You are given a list of known service names.
 
-            for (let d = new Date(incStart); d <= incEnd; d.setDate(d.getDate() + 1)) {
-              const dayIdx = Math.floor((d.getTime() - startDate.getTime()) / 86400000);
-              if (dayIdx >= 0 && dayIdx < numDays) {
-                services[svcIdx].uptime_days![dayIdx] = false;
-              }
-            }
+The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
+- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
+- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
+- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
+- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
+- transparent rects are hover overlays — SKIP them entirely
+
+CRITICAL RULES:
+1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
+2. Carefully check each rect's fill color. Do NOT assume all bars are green.
+3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
+4. Count the exact number of visible bar rects per service.
+5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
+6. Also extract "uptime_pct" if a percentage is shown near the service.
+
+Return ONLY valid JSON:
+{
+  "services": [
+    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
+  ]
+}
+Match service names EXACTLY as provided.`,
+          `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
+          uptimeHtml
+        );
+
+        // Merge uptime data into services
+        const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
+        for (const s of (pass2.services || [])) {
+          uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+        }
+
+        for (const svc of services) {
+          const uptime = uptimeMap.get(svc.name);
+          if (uptime) {
+            svc.uptime_pct = uptime.uptime_pct ?? null;
+            svc.uptime_days = uptime.uptime_days ?? null;
           }
         }
 
-        const oldestOnPage = incidents[incidents.length - 1]?.created_at?.slice(0, 10) || "";
-        if (oldestOnPage < cutoffDate) hasMore = false;
-        page++;
-      }
-
-      // Calculate uptime percentages
-      for (const svc of services) {
-        if (svc.uptime_days) {
-          const upDays = svc.uptime_days.filter((d: boolean) => d === true).length;
-          svc.uptime_pct = Math.round((upDays / numDays) * 10000) / 100;
+        for (const s of (pass2.services || [])) {
+          const days = s.uptime_days;
+          if (Array.isArray(days)) {
+            const falseCount = days.filter((d: any) => d === false).length;
+            const nullCount = days.filter((d: any) => d === null).length;
+            console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+          }
         }
+        console.log("Extracted uptime data from HTML scraping");
       }
-
-      console.log("Reconstructed uptime from incidents API");
     } catch (e: any) {
-      console.log("Could not fetch incidents for uptime:", e.message);
+      console.log("Could not scrape uptime bars:", e.message);
     }
 
-    const windowStart = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-
-    return { name: pageName, services, start_date: windowStart };
+    return { name: pageName, services, start_date: startDate };
   } catch (e) {
     console.log("Statuspage API not available:", e.message);
     return null;
