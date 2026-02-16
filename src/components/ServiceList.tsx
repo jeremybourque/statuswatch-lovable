@@ -26,7 +26,7 @@ function ServiceCard({ service }: { service: Service }) {
       >
         <div className="flex items-center gap-3 min-w-0">
           <StatusDot status={service.status} />
-          <span className="font-medium text-card-foreground truncate">{service.name}</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{service.name}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-sm font-medium ${statusConfig[service.status].colorClass}`}>
