@@ -301,18 +301,65 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
     console.log("Detected chart start date (since-value):", startDate);
 
     // Log summary of extracted bar data for debugging
+    const servicesNeedingFallback: string[] = [];
     for (const s of barData.services) {
       const days = s.uptime_days;
       const falseCount = days.filter((d) => d === false).length;
       const nullCount = days.filter((d) => d === null).length;
       console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+      if (days.length === 0) {
+        servicesNeedingFallback.push(s.name);
+      }
     }
     console.log("Pass 2 (deterministic) found uptime data for", barData.services.length, "services");
+
+    // ── PASS 2b: AI fallback for services with no SVG bar data ──
+    const aiFallbackMap = new Map<string, { uptime_pct: number | null; uptime_days: (boolean | null)[] }>();
+    if (servicesNeedingFallback.length > 0) {
+      console.log("AI fallback needed for", servicesNeedingFallback.length, "services:", servicesNeedingFallback);
+      const uptimeHtml = stripForUptime(rawHtml);
+      try {
+        const pass2ai = await callAI(
+          apiKey,
+          `You extract uptime bar chart data from status page HTML. Return ONLY valid JSON:
+{
+  "services": [
+    {
+      "name": "Service Name",
+      "uptime_pct": 99.95,
+      "uptime_days": [true, true, false, true, null]
+    }
+  ]
+}
+uptime_days: array of 90 booleans (true=up, false=down/degraded, null=no data), oldest first.
+uptime_pct: the percentage shown near the bar chart, or null if not visible.
+ONLY extract data for these services: ${JSON.stringify(servicesNeedingFallback)}`,
+          "Extract uptime bar data for the listed services from this HTML:",
+          uptimeHtml
+        );
+        for (const s of (pass2ai.services || [])) {
+          if (servicesNeedingFallback.includes(s.name)) {
+            aiFallbackMap.set(s.name, { uptime_pct: s.uptime_pct ?? null, uptime_days: s.uptime_days ?? [] });
+            console.log(`  AI fallback for ${s.name}: ${(s.uptime_days || []).length} bars`);
+          }
+        }
+      } catch (e) {
+        console.warn("AI fallback for uptime bars failed:", e.message);
+      }
+    }
 
     // ── Merge passes ──
     const uptimeMap = new Map<string, { uptime_pct: number | null; uptime_days: (boolean | null)[] }>();
     for (const s of barData.services) {
-      uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+      if (s.uptime_days.length > 0) {
+        uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+      }
+    }
+    // Layer AI fallback on top for services that had no deterministic data
+    for (const [name, data] of aiFallbackMap) {
+      if (!uptimeMap.has(name)) {
+        uptimeMap.set(name, data);
+      }
     }
 
     const mergedServices = (pass1.services || []).map((s: any) => {
