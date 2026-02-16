@@ -196,6 +196,13 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 
     console.log("Pass 1 found", pass1.services?.length ?? 0, "services");
 
+    // ── Extract chart date range from HTML ──
+    // Look for data attributes like: since-value="2025-12-17 00:00:00 UTC"
+    const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+    // Also look for visible date range text like "Dec 2025 - Feb 2026"
+    const startDate = sinceMatch ? sinceMatch[1] : null;
+    console.log("Detected chart start date:", startDate);
+
     // ── PASS 2: Extract uptime bar data ──
     const uptimeHtml = stripForUptime(rawHtml);
     console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
@@ -271,6 +278,7 @@ Match service names EXACTLY as provided.`,
     const result = {
       name: pass1.name,
       services: mergedServices,
+      start_date: startDate,
     };
 
     return new Response(
