@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, ArrowLeft, Loader2, Globe, Plus, Check } from "lucide-react";
+import { Activity, ArrowLeft, Loader2, Globe, Plus, Check, ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,90 @@ function slugify(text: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function getGroupStatus(services: ExtractedService[]): ServiceStatus {
+  if (services.some((s) => s.status === "major")) return "major";
+  if (services.some((s) => s.status === "partial")) return "partial";
+  if (services.some((s) => s.status === "degraded")) return "degraded";
+  if (services.some((s) => s.status === "maintenance")) return "maintenance";
+  return "operational";
+}
+
+function ExtractedServiceGroup({ groupName, services }: { groupName: string; services: ExtractedService[] }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const groupStatus = getGroupStatus(services);
+  const config = statusConfig[groupStatus] ?? statusConfig.operational;
+
+  return (
+    <div className="space-y-1.5">
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between group cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {groupName}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${config.colorClass}`}>{config.label}</span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+        </div>
+      </button>
+      {!collapsed && (
+        <div className="space-y-1.5">
+          {services.map((s, i) => {
+            const sc = statusConfig[s.status] ?? statusConfig.operational;
+            return (
+              <div key={i} className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2">
+                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${sc.dotClass}`} />
+                <span className="text-sm text-foreground">{s.name}</span>
+                <span className={`text-xs font-medium ml-auto ${sc.colorClass}`}>{sc.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
+  const groups = new Map<string, ExtractedService[]>();
+  services.forEach((s) => {
+    const key = s.group || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  });
+  const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
+
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm">Services ({services.length})</Label>
+      {Array.from(groups.entries()).map(([groupName, groupServices]) => (
+        <div key={groupName || "__ungrouped"}>
+          {hasGroups && groupName ? (
+            <ExtractedServiceGroup groupName={groupName} services={groupServices} />
+          ) : (
+            <div className="space-y-1.5">
+              {groupServices.map((s, i) => {
+                const config = statusConfig[s.status] ?? statusConfig.operational;
+                return (
+                  <div key={i} className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2">
+                    <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
+                    <span className="text-sm text-foreground">{s.name}</span>
+                    <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>{config.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 const AdminClonePage = () => {
@@ -176,46 +260,9 @@ const AdminClonePage = () => {
               </div>
             </div>
 
-            {extracted.services?.length > 0 && (() => {
-              // Group services by their group name
-              const groups = new Map<string, ExtractedService[]>();
-              extracted.services.forEach((s) => {
-                const key = s.group || "";
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key)!.push(s);
-              });
-              const hasGroups = groups.size > 1 || (groups.size === 1 && !groups.has(""));
-              
-              return (
-                <div className="space-y-3">
-                  <Label className="text-sm">Services ({extracted.services.length})</Label>
-                  {Array.from(groups.entries()).map(([groupName, groupServices]) => (
-                    <div key={groupName || "__ungrouped"} className="space-y-1.5">
-                      {hasGroups && (
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">
-                          {groupName || "Ungrouped"}
-                        </p>
-                      )}
-                      {groupServices.map((s, i) => {
-                        const config = statusConfig[s.status] ?? statusConfig.operational;
-                        return (
-                          <div
-                            key={`${groupName}-${i}`}
-                            className="flex items-center gap-3 border border-border rounded-lg bg-background px-3 py-2"
-                          >
-                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-                            <span className="text-sm text-foreground">{s.name}</span>
-                            <span className={`text-xs font-medium ml-auto ${config.colorClass}`}>
-                              {config.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+            {extracted.services?.length > 0 && (
+              <ExtractedServicesList services={extracted.services} />
+            )}
 
             <Button
               onClick={handleCreate}
