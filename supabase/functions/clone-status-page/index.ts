@@ -110,7 +110,7 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
         console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
         const serviceNames = services.map(s => s.name);
-        const uptimeMap = await extractUptimeBatched(apiKey, serviceNames, uptimeHtml, progress);
+        const uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
 
         let matchedCount = 0;
         for (const svc of services) {
@@ -230,54 +230,30 @@ Return ONLY valid JSON:
 }
 Match service names EXACTLY as provided.`;
 
-async function extractUptimeBatched(
+async function extractUptimeSingle(
   apiKey: string,
   serviceNames: string[],
   uptimeHtml: string,
   progress: ProgressFn,
 ): Promise<Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>> {
-  const BATCH_SIZE = 25;
-  const batches: string[][] = [];
-  for (let i = 0; i < serviceNames.length; i += BATCH_SIZE) {
-    batches.push(serviceNames.slice(i, i + BATCH_SIZE));
-  }
+  progress(`Sending SVG data to AI for color analysis (${serviceNames.length} services)...`);
 
-  progress(`Extracting uptime data in ${batches.length} batch(es) of ~${BATCH_SIZE} services...`);
+  const result = await callAI(
+    apiKey,
+    UPTIME_SYSTEM_PROMPT,
+    `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
+    uptimeHtml
+  );
+
+  progress("Mapping rect fill colors → operational / incident / no-data...");
 
   const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
-
-  // Process batches in parallel (max 3 concurrent to avoid rate limits)
-  const CONCURRENCY = 3;
-  for (let i = 0; i < batches.length; i += CONCURRENCY) {
-    const chunk = batches.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      chunk.map(async (batch, idx) => {
-        const batchNum = i + idx + 1;
-        progress(`AI analyzing batch ${batchNum}/${batches.length} (${batch.length} services)...`);
-        try {
-          const result = await callAI(
-            apiKey,
-            UPTIME_SYSTEM_PROMPT,
-            `Known services: ${JSON.stringify(batch)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-            uptimeHtml
-          );
-          return result;
-        } catch (e: any) {
-          console.error(`Batch ${batchNum} failed:`, e.message);
-          return { services: [] };
-        }
-      })
-    );
-
-    for (const result of results) {
-      for (const s of (result.services || [])) {
-        uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
-        if (Array.isArray(s.uptime_days)) {
-          const falseCount = s.uptime_days.filter((d: any) => d === false).length;
-          const nullCount = s.uptime_days.filter((d: any) => d === null).length;
-          console.log(`  ${s.name}: ${s.uptime_days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
-        }
-      }
+  for (const s of (result.services || [])) {
+    uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+    if (Array.isArray(s.uptime_days)) {
+      const falseCount = s.uptime_days.filter((d: any) => d === false).length;
+      const nullCount = s.uptime_days.filter((d: any) => d === null).length;
+      console.log(`  ${s.name}: ${s.uptime_days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
     }
   }
 
@@ -476,7 +452,7 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 
   const serviceNames = (pass1.services || []).map((s: any) => s.name);
 
-  const uptimeMap = await extractUptimeBatched(apiKey, serviceNames, uptimeHtml, progress);
+  const uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
 
   const mergedServices: ExtractedService[] = (pass1.services || []).map((s: any) => {
     const uptime = uptimeMap.get(s.name);
