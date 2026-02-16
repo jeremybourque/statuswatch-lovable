@@ -39,8 +39,10 @@ function ServiceCard({ service }: { service: Service }) {
       </button>
       {expanded && (
         <div className="px-4 pb-4">
-          <div className="flex items-center gap-3 ml-6">
-            <UptimeBar days={service.uptimeDays} />
+          <div className="flex items-center gap-2 ml-6">
+            <div className="flex-1 min-w-0">
+              <UptimeBar days={service.uptimeDays} />
+            </div>
             <span className="font-mono text-sm text-muted-foreground shrink-0">{service.uptime.toFixed(2)}%</span>
           </div>
         </div>
