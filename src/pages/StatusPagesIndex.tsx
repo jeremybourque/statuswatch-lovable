@@ -24,7 +24,7 @@ function usePageServices(pageId: string) {
 }
 
 function ServiceDots({ services }: { services: { name: string; status: ServiceStatus }[] }) {
-  const columns = Math.min(services.length, 8);
+  const columns = Math.min(services.length, 12);
   return (
     <div
       className="grid gap-1.5 justify-center"
