@@ -262,7 +262,7 @@ const AdminClonePage = () => {
             let anchorDate: Date;
             if (extracted.start_date) {
               const [y, m, d] = extracted.start_date.split("-").map(Number);
-              anchorDate = new Date(y, m - 1, d + 1); // since-value is exclusive, first bar is the day after
+              anchorDate = new Date(y, m - 1, d);
             } else {
               // Fallback: assume last bar is today
               anchorDate = new Date();
