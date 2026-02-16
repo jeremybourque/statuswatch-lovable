@@ -271,6 +271,7 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
     },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
+      max_tokens: 65536,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `${userPrompt}\n\n${truncated}` },
@@ -286,6 +287,10 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
   }
 
   const aiData = await aiRes.json();
+  const finishReason = aiData.choices?.[0]?.finish_reason;
+  if (finishReason === "length" || finishReason === "MAX_TOKENS") {
+    console.warn("AI response was TRUNCATED (finish_reason:", finishReason, ")");
+  }
   const content = aiData.choices?.[0]?.message?.content ?? "";
 
   let jsonStr = content;
