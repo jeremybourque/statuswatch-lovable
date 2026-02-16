@@ -341,7 +341,7 @@ async function fetchRenderedHTML(url: string): Promise<string> {
       formats: ["html"],
       waitFor: 5000,
       actions: [
-        { type: "click", selector: "[aria-expanded='false'], .collapsible-header, [data-toggle='collapse'], .component-container.collapsed, button[class*='expand'], summary" },
+        { type: "executeJavaScript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
         { type: "wait", milliseconds: 3000 },
       ],
     }),
@@ -381,7 +381,7 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
       formats: ["rawHtml"],
       waitFor: 5000,
       actions: [
-        { type: "click", selector: "[aria-expanded='false'], .collapsible-header, [data-toggle='collapse'], .component-container.collapsed, button[class*='expand'], summary" },
+        { type: "executeJavaScript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
         { type: "wait", milliseconds: 3000 },
       ],
     }),
