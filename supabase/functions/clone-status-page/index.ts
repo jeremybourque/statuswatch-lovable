@@ -87,7 +87,7 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
       componentIdToIdx.set(c.id, idx);
     });
 
-    // Fetch incidents to reconstruct uptime history (90 days)
+    // Reconstruct uptime history from incidents API (90 days)
     const numDays = 90;
     const today = new Date();
     const startDate = new Date(today);
@@ -98,12 +98,10 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
       svc.uptime_days = Array(numDays).fill(true);
     }
 
-    // Fetch recent incidents from the API
     try {
-      // Statuspage API paginates incidents, fetch enough pages to cover 90 days
       let page = 1;
       let hasMore = true;
-      const cutoffDate = startDate.toISOString().slice(0, 10);
+      const cutoffDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
 
       while (hasMore && page <= 5) {
         const incRes = await fetch(`${origin}/api/v2/incidents.json?page=${page}&per_page=100`, {
@@ -118,29 +116,25 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
           const incCreated = (inc.created_at || "").slice(0, 10);
           const incResolved = inc.resolved_at ? inc.resolved_at.slice(0, 10) : today.toISOString().slice(0, 10);
 
-          // Skip incidents older than our window
           if (incResolved < cutoffDate) {
             hasMore = false;
             break;
           }
 
-          // Find affected component IDs
           const affectedIds = new Set<string>();
           for (const comp of (inc.components || [])) {
             affectedIds.add(comp.id);
           }
 
-          // Mark affected days as false for each affected service
           for (const compId of affectedIds) {
             const svcIdx = componentIdToIdx.get(compId);
             if (svcIdx === undefined) continue;
 
-            // Calculate day range overlap with our 90-day window
             const incStart = new Date(Math.max(new Date(incCreated).getTime(), startDate.getTime()));
             const incEnd = new Date(Math.min(new Date(incResolved).getTime(), today.getTime()));
 
             for (let d = new Date(incStart); d <= incEnd; d.setDate(d.getDate() + 1)) {
-              const dayIdx = Math.floor((d.getTime() - startDate.getTime()) / (86400000));
+              const dayIdx = Math.floor((d.getTime() - startDate.getTime()) / 86400000);
               if (dayIdx >= 0 && dayIdx < numDays) {
                 services[svcIdx].uptime_days![dayIdx] = false;
               }
@@ -148,7 +142,6 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
           }
         }
 
-        // If the oldest incident on this page is before our cutoff, stop
         const oldestOnPage = incidents[incidents.length - 1]?.created_at?.slice(0, 10) || "";
         if (oldestOnPage < cutoffDate) hasMore = false;
         page++;
@@ -157,7 +150,7 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
       // Calculate uptime percentages
       for (const svc of services) {
         if (svc.uptime_days) {
-          const upDays = svc.uptime_days.filter(d => d === true).length;
+          const upDays = svc.uptime_days.filter((d: boolean) => d === true).length;
           svc.uptime_pct = Math.round((upDays / numDays) * 10000) / 100;
         }
       }
@@ -167,7 +160,6 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
       console.log("Could not fetch incidents for uptime:", e.message);
     }
 
-    // Compute start_date for the 90-day window
     const windowStart = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
 
     return { name: pageName, services, start_date: windowStart };
