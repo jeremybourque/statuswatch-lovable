@@ -109,66 +109,20 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
         console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
-        progress("Sending SVG data to AI for color analysis...");
         const serviceNames = services.map(s => s.name);
+        const uptimeMap = await extractUptimeBatched(apiKey, serviceNames, uptimeHtml, progress);
 
-        const pass2 = await callAI(
-          apiKey,
-          `You extract uptime bar data from status page HTML. You are given a list of known service names.
-
-The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
-- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
-- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
-- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
-- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
-- transparent rects are hover overlays — SKIP them entirely
-
-CRITICAL RULES:
-1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
-2. Carefully check each rect's fill color. Do NOT assume all bars are green.
-3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
-4. Count the exact number of visible bar rects per service.
-5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
-6. Also extract "uptime_pct" if a percentage is shown near the service.
-
-Return ONLY valid JSON:
-{
-  "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
-  ]
-}
-Match service names EXACTLY as provided.`,
-          `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-          uptimeHtml
-        );
-
-        progress("Mapping rect fill colors → operational / incident / no-data...");
-
-        const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
         let matchedCount = 0;
-        for (const s of (pass2.services || [])) {
-          uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
-          if (Array.isArray(s.uptime_days) && s.uptime_days.length > 0) matchedCount++;
-        }
-
         for (const svc of services) {
           const uptime = uptimeMap.get(svc.name);
           if (uptime) {
             svc.uptime_pct = uptime.uptime_pct ?? null;
             svc.uptime_days = uptime.uptime_days ?? null;
+            if (Array.isArray(svc.uptime_days) && svc.uptime_days.length > 0) matchedCount++;
           }
         }
 
         progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
-
-        for (const s of (pass2.services || [])) {
-          const days = s.uptime_days;
-          if (Array.isArray(days)) {
-            const falseCount = days.filter((d: any) => d === false).length;
-            const nullCount = days.filter((d: any) => d === null).length;
-            console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
-          }
-        }
       }
     } catch (e: any) {
       progress(`Could not scrape uptime bars: ${e.message}`);
@@ -251,8 +205,87 @@ function stripForUptime(html: string): string {
     .replace(/>\s+</g, "><");
 }
 
+const UPTIME_SYSTEM_PROMPT = `You extract uptime bar data from status page HTML. You are given a list of known service names.
+
+The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
+- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
+- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
+- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
+- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
+- transparent rects are hover overlays — SKIP them entirely
+
+CRITICAL RULES:
+1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
+2. Carefully check each rect's fill color. Do NOT assume all bars are green.
+3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
+4. Count the exact number of visible bar rects per service.
+5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
+6. Also extract "uptime_pct" if a percentage is shown near the service.
+
+Return ONLY valid JSON:
+{
+  "services": [
+    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
+  ]
+}
+Match service names EXACTLY as provided.`;
+
+async function extractUptimeBatched(
+  apiKey: string,
+  serviceNames: string[],
+  uptimeHtml: string,
+  progress: ProgressFn,
+): Promise<Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>> {
+  const BATCH_SIZE = 25;
+  const batches: string[][] = [];
+  for (let i = 0; i < serviceNames.length; i += BATCH_SIZE) {
+    batches.push(serviceNames.slice(i, i + BATCH_SIZE));
+  }
+
+  progress(`Extracting uptime data in ${batches.length} batch(es) of ~${BATCH_SIZE} services...`);
+
+  const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
+
+  // Process batches in parallel (max 3 concurrent to avoid rate limits)
+  const CONCURRENCY = 3;
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    const chunk = batches.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map(async (batch, idx) => {
+        const batchNum = i + idx + 1;
+        progress(`AI analyzing batch ${batchNum}/${batches.length} (${batch.length} services)...`);
+        try {
+          const result = await callAI(
+            apiKey,
+            UPTIME_SYSTEM_PROMPT,
+            `Known services: ${JSON.stringify(batch)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
+            uptimeHtml
+          );
+          return result;
+        } catch (e: any) {
+          console.error(`Batch ${batchNum} failed:`, e.message);
+          return { services: [] };
+        }
+      })
+    );
+
+    for (const result of results) {
+      for (const s of (result.services || [])) {
+        uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+        if (Array.isArray(s.uptime_days)) {
+          const falseCount = s.uptime_days.filter((d: any) => d === false).length;
+          const nullCount = s.uptime_days.filter((d: any) => d === null).length;
+          console.log(`  ${s.name}: ${s.uptime_days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+        }
+      }
+    }
+  }
+
+  return uptimeMap;
+}
+
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, htmlContent: string): Promise<any> {
-  const truncated = htmlContent.slice(0, 500000);
+  const truncated = htmlContent.slice(0, 800000);
 
   const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -443,63 +476,16 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 
   const serviceNames = (pass1.services || []).map((s: any) => s.name);
 
-  progress("Sending SVG data to AI for uptime color analysis...");
-  const pass2 = await callAI(
-    apiKey,
-    `You extract uptime bar data from status page HTML. You are given a list of known service names.
-
-The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
-- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
-- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
-- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
-- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
-- transparent rects are hover overlays — SKIP them entirely
-
-CRITICAL RULES:
-1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
-2. Carefully check each rect's fill color. Do NOT assume all bars are green.
-3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
-4. Count the exact number of visible bar rects per service.
-5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
-6. Also extract "uptime_pct" if a percentage is shown near the service.
-
-Return ONLY valid JSON:
-{
-  "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
-  ]
-}
-Match service names EXACTLY as provided.`,
-    `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-    uptimeHtml
-  );
-
-  progress("Merging uptime history into service records...");
-
-  for (const s of (pass2.services || [])) {
-    const days = s.uptime_days;
-    if (Array.isArray(days)) {
-      const falseCount = days.filter((d: any) => d === false).length;
-      const nullCount = days.filter((d: any) => d === null).length;
-      console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
-    }
-  }
-  console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
-
-  const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
-  for (const s of (pass2.services || [])) {
-    uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
-  }
+  const uptimeMap = await extractUptimeBatched(apiKey, serviceNames, uptimeHtml, progress);
 
   const mergedServices: ExtractedService[] = (pass1.services || []).map((s: any) => {
     const uptime = uptimeMap.get(s.name);
-    const days: (boolean | null)[] = uptime?.uptime_days ?? [];
     return {
       name: s.name,
       status: s.status,
       group: s.group,
       uptime_pct: uptime?.uptime_pct ?? null,
-      uptime_days: days,
+      uptime_days: uptime?.uptime_days ?? [],
     };
   });
 
