@@ -6,6 +6,103 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type ServiceStatus = "operational" | "degraded" | "partial" | "major" | "maintenance";
+
+interface ExtractedService {
+  name: string;
+  status: ServiceStatus;
+  group?: string | null;
+  uptime_pct?: number | null;
+  uptime_days?: (boolean | null)[] | null;
+}
+
+interface ExtractedResult {
+  name: string;
+  services: ExtractedService[];
+  start_date: string | null;
+}
+
+// ── Atlassian Statuspage API approach ──
+
+function mapStatuspageStatus(status: string): ServiceStatus {
+  switch (status) {
+    case "operational": return "operational";
+    case "degraded_performance": return "degraded";
+    case "partial_outage": return "partial";
+    case "major_outage": return "major";
+    case "under_maintenance": return "maintenance";
+    default: return "operational";
+  }
+}
+
+async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null> {
+  const origin = new URL(baseUrl).origin;
+
+  // Try the Atlassian Statuspage v2 API
+  try {
+    const summaryRes = await fetch(`${origin}/api/v2/summary.json`, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+    });
+    if (!summaryRes.ok) return null;
+    const summary = await summaryRes.json();
+
+    if (!summary?.components?.length) return null;
+
+    const pageName = summary.page?.name || "Status Page";
+
+    // Filter out the top-level "page" component and build group map
+    const groupMap = new Map<string, string>();
+    const components = summary.components.filter((c: any) => {
+      if (c.group) return false; // this IS a group header
+      if (c.group_id) {
+        // find the group name
+        const parent = summary.components.find((p: any) => p.id === c.group_id);
+        if (parent) groupMap.set(c.id, parent.name);
+      }
+      return true;
+    });
+
+    // Also filter out the top-level aggregate component (if name matches page name)
+    const services: ExtractedService[] = components
+      .filter((c: any) => c.name !== pageName)
+      .map((c: any) => ({
+        name: c.name,
+        status: mapStatuspageStatus(c.status),
+        group: groupMap.get(c.id) || null,
+        uptime_pct: null,
+        uptime_days: null,
+      }));
+
+    console.log(`Statuspage API found ${services.length} components`);
+
+    // Try to get uptime data from the undocumented uptime endpoint
+    try {
+      const uptimeRes = await fetch(`${origin}/uptime.json`, {
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      });
+      if (uptimeRes.ok) {
+        const uptimeData = await uptimeRes.json();
+        // Some statuspage instances expose uptime percentages
+        if (uptimeData?.components) {
+          for (const svc of services) {
+            const match = uptimeData.components.find((u: any) => u.name === svc.name);
+            if (match?.uptime_percentage) {
+              svc.uptime_pct = parseFloat(match.uptime_percentage);
+            }
+          }
+        }
+      }
+    } catch { /* uptime endpoint is optional */ }
+
+    return { name: pageName, services, start_date: null };
+  } catch (e) {
+    console.log("Statuspage API not available:", e.message);
+    return null;
+  }
+}
+
+// ── HTML fetching ──
+
 async function fetchWithRetries(url: string): Promise<Response> {
   const attempts = [
     {
@@ -43,7 +140,7 @@ async function fetchWithRetries(url: string): Promise<Response> {
   throw new Error("All fetch attempts were blocked by the target site. Try a different URL.");
 }
 
-/** Aggressive strip for service/group extraction — remove everything non-content */
+/** Aggressive strip for service/group extraction */
 function stripForServices(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -52,16 +149,16 @@ function stripForServices(html: string): string {
     .replace(/<head[\s\S]*?<\/head>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, "") // Remove SVGs to save tokens
+    .replace(/<svg[\s\S]*?<\/svg>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s+style="[^"]*"/g, "")
-    .replace(/\s+class="[^"]*"/g, "") // Remove classes too — not needed for names
-    .replace(/\s+data-[a-z-]+="[^"]*"/gi, "") // Remove data attributes
+    .replace(/\s+class="[^"]*"/g, "")
+    .replace(/\s+data-[a-z-]+="[^"]*"/gi, "")
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
 }
 
-/** Lighter strip for uptime bar data — keep SVGs, inline styles (colors live in style="fill: #hex"), and data attributes */
+/** Lighter strip for uptime bar data */
 function stripForUptime(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -103,7 +200,6 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
   const aiData = await aiRes.json();
   const content = aiData.choices?.[0]?.message?.content ?? "";
 
-  // Extract JSON from response
   let jsonStr = content;
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
@@ -113,7 +209,6 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
   try {
     return JSON.parse(jsonStr);
   } catch {
-    // Attempt to repair truncated JSON
     let repaired = jsonStr;
     let braces = 0, brackets = 0;
     for (const char of repaired) {
@@ -133,6 +228,118 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
       throw new Error("Could not parse AI response");
     }
   }
+}
+
+async function extractViaHTML(url: string, apiKey: string): Promise<ExtractedResult> {
+  let rawHtml: string;
+  try {
+    const pageRes = await fetchWithRetries(url);
+    rawHtml = await pageRes.text();
+  } catch (fetchErr: any) {
+    throw new Error(fetchErr.message);
+  }
+
+  console.log("Fetched HTML length:", rawHtml.length);
+
+  const servicesHtml = stripForServices(rawHtml);
+  console.log("Pass 1 (services) stripped HTML length:", servicesHtml.length);
+
+  // If stripped HTML is very small, the page is likely JS-rendered
+  if (servicesHtml.length < 200) {
+    throw new Error("This status page appears to be JavaScript-rendered. The page content could not be extracted with a simple fetch. Try a different status page URL, or one that uses server-side rendering.");
+  }
+
+  const pass1 = await callAI(
+    apiKey,
+    `You extract status page data from HTML. Return ONLY valid JSON with this structure:
+{
+  "name": "Page name/title",
+  "services": [
+    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null" }
+  ]
+}
+IMPORTANT: Extract ALL services listed on the page. Look for every component/service entry.
+If services are organized into groups/categories, include the group name. If no group, set "group" to null.
+CRITICAL: Group/category headers are NOT services. Do NOT include group names as separate service entries.
+Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational".
+For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.`,
+    "Extract the status page name and ALL services with their current statuses from this HTML:",
+    servicesHtml
+  );
+
+  console.log("Pass 1 found", pass1.services?.length ?? 0, "services");
+
+  // Extract chart date range
+  const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+  const startDate = sinceMatch ? sinceMatch[1] : null;
+  console.log("Detected chart start date:", startDate);
+
+  // Pass 2: uptime bars
+  const uptimeHtml = stripForUptime(rawHtml);
+  console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
+
+  const serviceNames = (pass1.services || []).map((s: any) => s.name);
+
+  const pass2 = await callAI(
+    apiKey,
+    `You extract uptime bar data from status page HTML. You are given a list of known service names.
+
+The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
+- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
+- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
+- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
+- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
+- transparent rects are hover overlays — SKIP them entirely
+
+CRITICAL RULES:
+1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
+2. Carefully check each rect's fill color. Do NOT assume all bars are green.
+3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
+4. Count the exact number of visible bar rects per service.
+5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
+6. Also extract "uptime_pct" if a percentage is shown near the service.
+
+Return ONLY valid JSON:
+{
+  "services": [
+    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
+  ]
+}
+Match service names EXACTLY as provided.`,
+    `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
+    uptimeHtml
+  );
+
+  for (const s of (pass2.services || [])) {
+    const days = s.uptime_days;
+    if (Array.isArray(days)) {
+      const falseCount = days.filter((d: any) => d === false).length;
+      const nullCount = days.filter((d: any) => d === null).length;
+      console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+    }
+  }
+  console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
+
+  // Merge passes
+  const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
+  for (const s of (pass2.services || [])) {
+    uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+  }
+
+  const mergedServices: ExtractedService[] = (pass1.services || []).map((s: any) => {
+    const uptime = uptimeMap.get(s.name);
+    const days: (boolean | null)[] = uptime?.uptime_days ?? [];
+    // Preserve the actual number of bars from the source — no padding/trimming
+    return {
+      name: s.name,
+      status: s.status,
+      group: s.group,
+      uptime_pct: uptime?.uptime_pct ?? null,
+      uptime_days: days,
+    };
+  });
+
+  return { name: pass1.name, services: mergedServices, start_date: startDate };
 }
 
 Deno.serve(async (req) => {
@@ -159,133 +366,28 @@ Deno.serve(async (req) => {
 
     console.log("Fetching URL:", url);
 
-    let rawHtml: string;
+    // Strategy 1: Try Atlassian Statuspage API (works for JS-rendered pages too)
+    let result: ExtractedResult | null = null;
     try {
-      const pageRes = await fetchWithRetries(url);
-      rawHtml = await pageRes.text();
-    } catch (fetchErr) {
-      return new Response(
-        JSON.stringify({ success: false, error: fetchErr.message }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Fetched HTML length:", rawHtml.length);
-
-    // ── PASS 1: Extract services and groups ──
-    const servicesHtml = stripForServices(rawHtml);
-    console.log("Pass 1 (services) stripped HTML length:", servicesHtml.length);
-
-    const pass1 = await callAI(
-      apiKey,
-      `You extract status page data from HTML. Return ONLY valid JSON with this structure:
-{
-  "name": "Page name/title",
-  "services": [
-    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null" }
-  ]
-}
-IMPORTANT: Extract ALL services listed on the page. Look for every component/service entry.
-If services are organized into groups/categories, include the group name. If no group, set "group" to null.
-CRITICAL: Group/category headers are NOT services. Do NOT include group names as separate service entries.
-Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational".
-For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.`,
-      "Extract the status page name and ALL services with their current statuses from this HTML:",
-      servicesHtml
-    );
-
-    console.log("Pass 1 found", pass1.services?.length ?? 0, "services");
-
-    // ── Extract chart date range from HTML ──
-    // Look for data attributes like: since-value="2025-12-17 00:00:00 UTC"
-    const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-    // Also look for visible date range text like "Dec 2025 - Feb 2026"
-    const startDate = sinceMatch ? sinceMatch[1] : null;
-    console.log("Detected chart start date:", startDate);
-
-    // ── PASS 2: Extract uptime bar data ──
-    const uptimeHtml = stripForUptime(rawHtml);
-    console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
-
-    // Build service name list for the AI to match against
-    const serviceNames = (pass1.services || []).map((s: any) => s.name);
-
-    const pass2 = await callAI(
-      apiKey,
-      `You extract uptime bar data from status page HTML. You are given a list of known service names.
-
-The uptime bars are typically SVG charts with <rect> elements. Each visible rect has an inline style with a fill color:
-- GREEN (#3CB878, #22c55e, #10b981, #4ade80, green shades) → true (operational day)
-- RED (#EF4444, #dc2626, #f87171, #E74C3C, red shades) → false (incident/outage day)
-- ORANGE/YELLOW (#F59E0B, #f97316, #eab308, orange/yellow shades) → false (degraded/partial day)
-- GRAY (#9CA3AF, #6B7280, #d1d5db, gray shades) → null (no data)
-- transparent rects are hover overlays — SKIP them entirely
-
-CRITICAL RULES:
-1. Only count rects with a visible fill color (NOT transparent, NOT fill-opacity="0"). Skip overlay/hover rects.
-2. Carefully check each rect's fill color. Do NOT assume all bars are green.
-3. Any fill that is NOT a shade of green MUST be mapped to false (red/orange/yellow) or null (gray).
-4. Count the exact number of visible bar rects per service.
-5. Order: oldest (leftmost, smallest x) to newest (rightmost, largest x).
-6. Also extract "uptime_pct" if a percentage is shown near the service.
-
-Return ONLY valid JSON:
-{
-  "services": [
-    { "name": "Service Name", "uptime_pct": 99.99, "uptime_days": [true, true, false, true, null] }
-  ]
-}
-Match service names EXACTLY as provided.`,
-      `Known services: ${JSON.stringify(serviceNames)}\n\nExtract the fill color of each visible SVG rect bar for each service. Map green fills to true, red/orange/yellow to false, gray to null. Skip transparent overlay rects:`,
-      uptimeHtml
-    );
-
-    // Log summary of extracted bar data for debugging
-    for (const s of (pass2.services || [])) {
-      const days = s.uptime_days;
-      if (Array.isArray(days)) {
-        const falseCount = days.filter((d: any) => d === false).length;
-        const nullCount = days.filter((d: any) => d === null).length;
-        console.log(`  ${s.name}: ${days.length} bars, ${falseCount} incidents, ${nullCount} no-data, uptime: ${s.uptime_pct}%`);
+      result = await tryStatuspageAPI(url);
+      if (result) {
+        console.log("Successfully extracted via Statuspage API");
       }
-    }
-    console.log("Pass 2 found uptime data for", pass2.services?.length ?? 0, "services");
-
-    // ── Merge passes ──
-    const uptimeMap = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
-    for (const s of (pass2.services || [])) {
-      uptimeMap.set(s.name, { uptime_pct: s.uptime_pct, uptime_days: s.uptime_days });
+    } catch (e) {
+      console.log("Statuspage API attempt failed:", e.message);
     }
 
-    const mergedServices = (pass1.services || []).map((s: any) => {
-      const uptime = uptimeMap.get(s.name);
-      let days: (boolean | null)[] = uptime?.uptime_days ?? [];
-      // Always ensure exactly 90 days, padding with null (no data) on the left
-      if (days.length < 90) {
-        days = [...Array(90 - days.length).fill(null), ...days];
-      } else if (days.length > 90) {
-        days = days.slice(days.length - 90);
-      }
-      return {
-        name: s.name,
-        status: s.status,
-        group: s.group,
-        uptime_pct: uptime?.uptime_pct ?? null,
-        uptime_days: days,
-      };
-    });
-
-    const result = {
-      name: pass1.name,
-      services: mergedServices,
-      start_date: startDate,
-    };
+    // Strategy 2: Fall back to HTML scraping with AI
+    if (!result) {
+      console.log("Falling back to HTML scraping...");
+      result = await extractViaHTML(url, apiKey);
+    }
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
