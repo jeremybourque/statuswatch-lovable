@@ -259,15 +259,12 @@ const AdminClonePage = () => {
           if (s.uptime_days && s.uptime_days.length > 0 && createdServices?.[i]) {
             const serviceId = createdServices[i].id;
             // Use the source page's start date to anchor bars to correct dates
+            // Anchor last bar to today (local time) — most reliable approach
             let anchorDate: Date;
-            if (extracted.start_date) {
-              const [y, m, d] = extracted.start_date.split("-").map(Number);
-              anchorDate = new Date(y, m - 1, d);
-            } else {
-              // Fallback: assume last bar is today
-              anchorDate = new Date();
-              anchorDate.setDate(anchorDate.getDate() - (s.uptime_days.length - 1));
-            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            anchorDate = new Date(today);
+            anchorDate.setDate(today.getDate() - (s.uptime_days.length - 1));
             s.uptime_days.forEach((up, dayIdx) => {
               if (up === null) return;
               const date = new Date(anchorDate);
