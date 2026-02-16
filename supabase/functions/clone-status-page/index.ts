@@ -50,28 +50,34 @@ async function tryStatuspageAPI(baseUrl: string): Promise<ExtractedResult | null
 
     const pageName = summary.page?.name || "Status Page";
 
-    // Filter out the top-level "page" component and build group map
-    const groupMap = new Map<string, string>();
-    const components = summary.components.filter((c: any) => {
-      if (c.group) return false; // this IS a group header
-      if (c.group_id) {
-        // find the group name
-        const parent = summary.components.find((p: any) => p.id === c.group_id);
-        if (parent) groupMap.set(c.id, parent.name);
+    // Build group info map (id -> { name, position })
+    const groupInfoMap = new Map<string, { name: string; position: number }>();
+    const childComponents: any[] = [];
+
+    for (const c of summary.components) {
+      if (c.group) {
+        // This IS a group header
+        groupInfoMap.set(c.id, { name: c.name, position: c.position ?? 0 });
+      } else if (c.name !== pageName) {
+        childComponents.push(c);
       }
-      return true;
+    }
+
+    // Sort: group position first (ungrouped use their own position), then component position within group
+    childComponents.sort((a: any, b: any) => {
+      const aGroupPos = a.group_id ? (groupInfoMap.get(a.group_id)?.position ?? 0) : (a.position ?? 0);
+      const bGroupPos = b.group_id ? (groupInfoMap.get(b.group_id)?.position ?? 0) : (b.position ?? 0);
+      if (aGroupPos !== bGroupPos) return aGroupPos - bGroupPos;
+      return (a.position ?? 0) - (b.position ?? 0);
     });
 
-    // Also filter out the top-level aggregate component (if name matches page name)
-    const services: ExtractedService[] = components
-      .filter((c: any) => c.name !== pageName)
-      .map((c: any) => ({
-        name: c.name,
-        status: mapStatuspageStatus(c.status),
-        group: groupMap.get(c.id) || null,
-        uptime_pct: null,
-        uptime_days: null,
-      }));
+    const services: ExtractedService[] = childComponents.map((c: any) => ({
+      name: c.name,
+      status: mapStatuspageStatus(c.status),
+      group: c.group_id ? (groupInfoMap.get(c.group_id)?.name || null) : null,
+      uptime_pct: null,
+      uptime_days: null,
+    }));
 
     console.log(`Statuspage API found ${services.length} components`);
 
