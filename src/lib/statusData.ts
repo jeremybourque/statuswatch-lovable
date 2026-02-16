@@ -5,7 +5,7 @@ export interface Service {
   name: string;
   status: ServiceStatus;
   uptime: number;
-  uptimeDays: boolean[];
+  uptimeDays: (boolean | null)[];
   group_name?: string | null;
 }
 

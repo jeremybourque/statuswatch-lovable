@@ -13,7 +13,7 @@ interface ExtractedService {
   status: ServiceStatus;
   group?: string | null;
   uptime_pct?: number | null;
-  uptime_days?: boolean[] | null;
+  uptime_days?: (boolean | null)[] | null;
 }
 
 interface ExtractedData {
@@ -63,7 +63,7 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
                 {service.uptime_days.map((up, i) => (
                   <div
                     key={i}
-                    className={`h-6 flex-1 rounded-sm ${up ? "bg-status-operational" : "bg-status-major"}`}
+                    className={`h-6 flex-1 rounded-sm ${up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"}`}
                   />
                 ))}
               </div>
@@ -234,6 +234,7 @@ const AdminClonePage = () => {
             const serviceId = createdServices[i].id;
             const today = new Date();
             s.uptime_days.forEach((up, dayIdx) => {
+              if (up === null) return; // Skip days with no data
               const date = new Date(today);
               date.setDate(date.getDate() - (s.uptime_days!.length - 1 - dayIdx));
               uptimeRows.push({

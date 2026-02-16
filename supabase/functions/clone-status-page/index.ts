@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
 {
   "name": "Page name/title",
   "services": [
-    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null", "uptime_pct": 99.99, "uptime_days": [true, true, false, true] }
+    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null", "uptime_pct": 99.99, "uptime_days": [true, true, null, false, true] }
   ]
 }
 IMPORTANT: Extract ALL services listed on the page, not just the first one. Look for every component/service entry.
@@ -133,7 +133,7 @@ CRITICAL: Group/category headers are NOT services. Do NOT include group names as
 Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational". For the "name" field, remove any trailing suffixes like "| Status", "Status", "- Status Page", etc. Return just the clean company/product name.
 
 UPTIME DATA: If the page shows uptime percentage for a service, include it as "uptime_pct" (a number like 99.99). If not available, set to null.
-If the page shows a daily uptime bar/chart (colored bars indicating up/down for each day), extract it as "uptime_days": an array of booleans (true=up, false=down) ordered from oldest to newest (left to right as displayed). Look for colored bars, dots, or segments that represent daily status - green/gray segments typically mean "up" (true), and red/orange/yellow segments mean "down" (false). If no daily data is visible, set "uptime_days" to null.`,
+If the page shows a daily uptime bar/chart (colored bars indicating up/down for each day), extract it as "uptime_days": an array where each element is true (up/operational), false (down/outage), or null (no data/unknown/gray). Ordered from oldest to newest (left to right as displayed). Look for colored bars, dots, or segments - green segments mean true, red/orange segments mean false, and gray/empty/light segments mean null (no data). If no daily data is visible, set "uptime_days" to null.`,
           },
           {
             role: "user",
