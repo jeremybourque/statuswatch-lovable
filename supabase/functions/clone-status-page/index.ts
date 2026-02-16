@@ -87,11 +87,8 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
     try {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (apiKey) {
-        progress("Downloading page HTML for uptime bar extraction...");
-        const pageRes = await fetch(origin, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
-        });
-        let rawHtml = await pageRes.text();
+        progress("Using Firecrawl to render page for uptime bar extraction...");
+        let rawHtml = await fetchRenderedHTMLForUptime(origin, progress);
         console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
         const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
@@ -344,6 +341,46 @@ async function fetchRenderedHTML(url: string): Promise<string> {
   return html;
 }
 
+async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Promise<string> {
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!firecrawlKey) {
+    progress("Firecrawl not configured, falling back to plain fetch...");
+    const pageRes = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
+    });
+    return await pageRes.text();
+  }
+
+  console.log("Using Firecrawl for uptime HTML:", url);
+  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${firecrawlKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["rawHtml"],
+      waitFor: 5000,
+    }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.text();
+    console.error("Firecrawl uptime error:", errData);
+    progress("Firecrawl failed, falling back to plain fetch...");
+    const pageRes = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" },
+    });
+    return await pageRes.text();
+  }
+
+  const data = await res.json();
+  const html = data?.data?.rawHtml || data?.rawHtml || data?.data?.html || data?.html || "";
+  console.log("Firecrawl uptime HTML length:", html.length);
+  return html;
+}
+
 async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn): Promise<ExtractedResult> {
   progress("Fetching page HTML...");
   let rawHtml: string;
@@ -395,9 +432,14 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
   const startDate = sinceMatch ? sinceMatch[1] : null;
   progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found");
 
-  progress("Preparing HTML for uptime bar extraction...");
-  const uptimeHtml = stripForUptime(rawHtml);
+  progress("Using Firecrawl for uptime bar HTML...");
+  const uptimeRawHtml = await fetchRenderedHTMLForUptime(url, progress);
+  const uptimeHtml = stripForUptime(uptimeRawHtml);
   console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
+
+  // Try to find date anchor in the rendered HTML
+  const sinceMatch2 = uptimeRawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+  const startDate2 = sinceMatch2 ? sinceMatch2[1] : startDate;
 
   const serviceNames = (pass1.services || []).map((s: any) => s.name);
 
@@ -467,7 +509,7 @@ Match service names EXACTLY as provided.`,
   }
   progress(`Parsed uptime bars for ${matchedCount}/${mergedServices.length} services`);
 
-  return { name: pass1.name, services: mergedServices, start_date: startDate };
+  return { name: pass1.name, services: mergedServices, start_date: startDate2 };
 }
 
 Deno.serve(async (req) => {
