@@ -46,7 +46,7 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
       >
         <div className="flex items-center gap-2">
           <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{service.name}</span>
+          <span className="text-sm font-medium text-card-foreground">{service.name}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-medium ${config.colorClass}`}>{config.label}</span>
