@@ -6,6 +6,7 @@ export interface Service {
   status: ServiceStatus;
   uptime: number;
   uptimeDays: boolean[];
+  group_name?: string | null;
 }
 
 export interface IncidentUpdate {
