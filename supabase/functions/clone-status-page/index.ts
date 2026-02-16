@@ -324,25 +324,23 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
     } else {
       // No deterministic data at all — fall back to AI for the whole page
       console.log("No deterministic bar data found. Falling back to AI for entire page.");
-      const uptimeHtml = stripForUptime(rawHtml);
-      const truncatedHtml = uptimeHtml.slice(0, 400000);
+      const uptimeHtml = stripForServices(rawHtml);
+      const truncatedHtml = uptimeHtml.slice(0, 300000);
       console.log("AI fallback HTML length:", truncatedHtml.length);
 
-      // Batch services to avoid overwhelming the AI with huge prompts
-      const BATCH_SIZE = 30;
+      // Batch services and run in parallel to stay within timeout
+      const BATCH_SIZE = 40;
       const batches: string[][] = [];
       for (let i = 0; i < serviceNames.length; i += BATCH_SIZE) {
         batches.push(serviceNames.slice(i, i + BATCH_SIZE));
       }
-      console.log(`Processing ${batches.length} batch(es) of services for AI fallback`);
+      console.log(`Processing ${batches.length} batch(es) in parallel for AI fallback`);
 
-      for (let b = 0; b < batches.length; b++) {
-        const batch = batches[b];
+      const batchPromises = batches.map((batch, b) => {
         console.log(`AI fallback batch ${b + 1}/${batches.length}: ${batch.length} services`);
-        try {
-          const pass2ai = await callAI(
-            apiKey,
-            `You extract uptime bar chart data from status page HTML. Return ONLY valid JSON:
+        return callAI(
+          apiKey,
+          `You extract uptime bar chart data from status page HTML. Return ONLY valid JSON:
 {
   "services": [
     {
@@ -355,15 +353,19 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
 uptime_days: array of 90 booleans (true=up, false=down/degraded, null=no data), oldest first.
 uptime_pct: the percentage shown near the bar chart, or null if not visible.
 ONLY extract data for these specific services: ${JSON.stringify(batch)}`,
-            "Extract uptime bar data for the listed services from this HTML:",
-            truncatedHtml
-          );
-          for (const s of (pass2ai.services || [])) {
-            uptimeMap.set(s.name, { uptime_pct: s.uptime_pct ?? null, uptime_days: s.uptime_days ?? [] });
-            console.log(`  AI extracted ${s.name}: ${(s.uptime_days || []).length} bars`);
-          }
-        } catch (e) {
+          "Extract uptime bar data for the listed services from this HTML:",
+          truncatedHtml
+        ).catch((e: any) => {
           console.warn(`AI fallback batch ${b + 1} failed:`, e.message);
+          return { services: [] };
+        });
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      for (const result of batchResults) {
+        for (const s of (result.services || [])) {
+          uptimeMap.set(s.name, { uptime_pct: s.uptime_pct ?? null, uptime_days: s.uptime_days ?? [] });
+          console.log(`  AI extracted ${s.name}: ${(s.uptime_days || []).length} bars`);
         }
       }
     }
