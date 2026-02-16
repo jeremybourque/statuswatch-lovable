@@ -24,8 +24,12 @@ function usePageServices(pageId: string) {
 }
 
 function ServiceDots({ services }: { services: { name: string; status: ServiceStatus }[] }) {
+  const columns = Math.min(services.length, 8);
   return (
-    <div className="flex flex-wrap gap-1.5 justify-center">
+    <div
+      className="grid gap-1.5 justify-center"
+      style={{ gridTemplateColumns: `repeat(${columns}, min-content)` }}
+    >
       {services.map((s, i) => {
         const config = statusConfig[s.status];
         const isOperational = s.status === "operational";
