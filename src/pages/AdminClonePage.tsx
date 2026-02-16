@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { statusConfig, type ServiceStatus } from "@/lib/statusData";
+import { UptimeBar } from "@/components/UptimeBar";
 
 interface ExtractedService {
   name: string;
@@ -71,17 +72,11 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
             <div className="flex-1 min-w-0">
-              <div className="flex gap-[2px] items-end">
-                {(service.uptime_days && service.uptime_days.length > 0
+              <UptimeBar days={
+                service.uptime_days && service.uptime_days.length > 0
                   ? service.uptime_days
                   : Array(90).fill(null)
-                ).map((up, i) => (
-                  <div
-                    key={i}
-                    className={`flex-1 min-w-[4px] h-6 rounded-sm ${up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"}`}
-                  />
-                ))}
-              </div>
+              } />
             </div>
             {service.uptime_pct != null && (
               <span className="font-mono text-sm text-muted-foreground shrink-0">
