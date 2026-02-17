@@ -68,7 +68,7 @@ export function useServices(statusPageId: string | undefined) {
         uptimeMap.get(row.service_id)!.set(row.day, row.up);
       }
 
-      return (services ?? []).map((s) => {
+      const flat = (services ?? []).map((s) => {
         const dayMap = uptimeMap.get(s.id);
         let days: (boolean | null)[] = [];
         if (dayMap && dayMap.size > 0) {
@@ -86,9 +86,40 @@ export function useServices(statusPageId: string | undefined) {
           status: s.status as ServiceStatus,
           uptime: Number(s.uptime),
           uptimeDays: days,
-          group_name: s.group_name,
+          parent_id: (s as any).parent_id as string | null,
         };
       });
+
+      // Build parent-child tree
+      const parentMap = new Map<string, Service>();
+      const topLevel: Service[] = [];
+
+      for (const svc of flat) {
+        if (!svc.parent_id) {
+          parentMap.set(svc.id, { ...svc, children: [] });
+        }
+      }
+
+      for (const svc of flat) {
+        if (svc.parent_id) {
+          const parent = parentMap.get(svc.parent_id);
+          if (parent) {
+            parent.children!.push(svc);
+          } else {
+            // Orphan — treat as top-level
+            topLevel.push(svc);
+          }
+        }
+      }
+
+      // Preserve display_order: parents first, then orphans
+      for (const svc of flat) {
+        if (!svc.parent_id && parentMap.has(svc.id)) {
+          topLevel.push(parentMap.get(svc.id)!);
+        }
+      }
+
+      return topLevel;
     },
   });
 }
