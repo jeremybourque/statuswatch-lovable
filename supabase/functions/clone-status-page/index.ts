@@ -357,6 +357,8 @@ async function fetchRenderedHTML(url: string): Promise<string> {
   const data = await res.json();
   const html = data?.data?.html || data?.html || "";
   console.log("Firecrawl returned HTML length:", html.length);
+  console.log("Firecrawl HTML preview (first 3000 chars):", html.slice(0, 3000));
+  console.log("Firecrawl HTML preview (last 2000 chars):", html.slice(-2000));
   return html;
 }
 
@@ -402,6 +404,7 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
   const data = await res.json();
   const html = data?.data?.rawHtml || data?.rawHtml || data?.data?.html || data?.html || "";
   console.log("Firecrawl uptime HTML length:", html.length);
+  console.log("Firecrawl uptime HTML preview (first 3000 chars):", html.slice(0, 3000));
   return html;
 }
 
