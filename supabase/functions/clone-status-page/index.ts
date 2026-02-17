@@ -85,45 +85,51 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
     // Scrape the HTML page to extract uptime bar data from SVGs
     let startDate: string | null = null;
     try {
-      const apiKey = Deno.env.get("LOVABLE_API_KEY");
-      if (apiKey) {
-        progress("Using Firecrawl to render page for uptime bar extraction...");
-        let rawHtml = await fetchRenderedHTMLForUptime(origin, progress);
-        console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
+      progress("Using Firecrawl to render page for uptime bar extraction...");
+      let rawHtml = await fetchRenderedHTMLForUptime(origin, progress);
+      console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
-        const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-        startDate = sinceMatch ? sinceMatch[1] : null;
-        progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
+      const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+      startDate = sinceMatch ? sinceMatch[1] : null;
+      progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
 
-        progress("Stripping non-essential markup, keeping SVG data...");
-        const uptimeHtml = rawHtml
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-          .replace(/<head[\s\S]*?<\/head>/gi, "")
-          .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-          .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-          .replace(/<!--[\s\S]*?-->/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><");
+      progress("Stripping non-essential markup, keeping SVG data...");
+      const uptimeHtml = rawHtml
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+        .replace(/<head[\s\S]*?<\/head>/gi, "")
+        .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+        .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/>\s+</g, "><");
 
-        console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
+      console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
-        const serviceNames = services.map(s => s.name);
-        const uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
+      const serviceNames = services.map(s => s.name);
+      let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>;
 
-        let matchedCount = 0;
-        for (const svc of services) {
-          const uptime = uptimeMap.get(svc.name);
-          if (uptime) {
-            svc.uptime_pct = uptime.uptime_pct ?? null;
-            svc.uptime_days = uptime.uptime_days ?? null;
-            if (Array.isArray(svc.uptime_days) && svc.uptime_days.length > 0) matchedCount++;
-          }
-        }
-
-        progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
+      if (startDate) {
+        progress("Date anchor found — using deterministic SVG rect parsing...");
+        uptimeMap = parseSvgDeterministic(uptimeHtml, serviceNames, progress);
+      } else {
+        const apiKey = Deno.env.get("LOVABLE_API_KEY");
+        if (!apiKey) throw new Error("AI not configured for uptime extraction");
+        uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
       }
+
+      let matchedCount = 0;
+      for (const svc of services) {
+        const uptime = uptimeMap.get(svc.name);
+        if (uptime) {
+          svc.uptime_pct = uptime.uptime_pct ?? null;
+          svc.uptime_days = uptime.uptime_days ?? null;
+          if (Array.isArray(svc.uptime_days) && svc.uptime_days.length > 0) matchedCount++;
+        }
+      }
+
+      progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
     } catch (e: any) {
       progress(`Could not scrape uptime bars: ${e.message}`);
       console.log("Could not scrape uptime bars:", e.message);
@@ -203,6 +209,139 @@ function stripForUptime(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
+}
+
+// ── Deterministic SVG rect parser ──
+
+function hexToRgb(hex: string): [number, number, number] | null {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (h.length !== 6) return null;
+  const n = parseInt(h, 16);
+  if (isNaN(n)) return null;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function classifyFillColor(fill: string): boolean | null {
+  const f = fill.trim().toLowerCase();
+  if (!f || f === 'transparent' || f === 'none') return undefined as any; // skip
+
+  // Named colors
+  if (/^(green|limegreen|lime|forestgreen|seagreen|mediumseagreen)$/.test(f)) return true;
+  if (/^(red|orangered|tomato|crimson|firebrick|darkred)$/.test(f)) return false;
+  if (/^(orange|darkorange|gold|yellow|goldenrod)$/.test(f)) return false;
+  if (/^(gray|grey|lightgray|lightgrey|darkgray|darkgrey|silver|gainsboro)$/.test(f)) return null;
+
+  let r: number, g: number, b: number;
+
+  // Hex
+  if (f.startsWith('#')) {
+    const rgb = hexToRgb(f);
+    if (!rgb) return null;
+    [r, g, b] = rgb;
+  }
+  // rgb()/rgba()
+  else {
+    const rgbMatch = f.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (!rgbMatch) return null;
+    r = parseInt(rgbMatch[1]); g = parseInt(rgbMatch[2]); b = parseInt(rgbMatch[3]);
+  }
+
+  // Classify by RGB heuristics
+  // Green: dominant green channel
+  if (g > 130 && g > r * 1.2 && g > b) return true;
+  // Red: dominant red, low green
+  if (r > 180 && g < 120 && r > b) return false;
+  // Orange: high red, medium green, low blue
+  if (r > 180 && g > 80 && g < 200 && b < 100) return false;
+  // Yellow: high red and green, low blue
+  if (r > 200 && g > 180 && b < 100) return false;
+  // Gray: channels are close together
+  if (Math.abs(r - g) < 40 && Math.abs(g - b) < 40 && Math.abs(r - b) < 40) return null;
+
+  return null;
+}
+
+function parseSvgDeterministic(
+  html: string,
+  serviceNames: string[],
+  progress: ProgressFn,
+): Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }> {
+  const result = new Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>();
+
+  // Find all component-inner-container or similar sections
+  // Strategy: locate each service name, then find the nearest SVG after it and parse rects
+  for (const name of serviceNames) {
+    const nameIdx = html.indexOf(name);
+    if (nameIdx === -1) {
+      console.log(`  Deterministic: service "${name}" not found in HTML`);
+      continue;
+    }
+
+    // Find the next <svg after this name
+    const svgStartIdx = html.indexOf('<svg', nameIdx);
+    if (svgStartIdx === -1) continue;
+
+    // Bound the search: don't go past the next service name or too far
+    let boundIdx = html.length;
+    for (const other of serviceNames) {
+      if (other === name) continue;
+      const otherIdx = html.indexOf(other, nameIdx + name.length);
+      if (otherIdx !== -1 && otherIdx < boundIdx) boundIdx = otherIdx;
+    }
+
+    const svgEndIdx = html.indexOf('</svg>', svgStartIdx);
+    if (svgEndIdx === -1 || svgEndIdx > boundIdx + 500) continue;
+
+    const svgContent = html.slice(svgStartIdx, svgEndIdx + 6);
+
+    // Extract all rect elements with fill colors
+    const rects: { color: boolean | null; x: number }[] = [];
+    const rectRegex = /<rect[^>]*>/gi;
+    let match;
+    while ((match = rectRegex.exec(svgContent)) !== null) {
+      const rectStr = match[0];
+
+      // Skip rects with zero opacity (overlay/hover rects)
+      const opacityMatch = rectStr.match(/(?:fill-)?opacity="([^"]+)"/i);
+      if (opacityMatch && parseFloat(opacityMatch[1]) === 0) continue;
+
+      // Extract fill from attribute or inline style
+      let fill = '';
+      const fillAttr = rectStr.match(/fill="([^"]+)"/i);
+      if (fillAttr) fill = fillAttr[1];
+      if (!fill || fill === 'transparent' || fill === 'none') {
+        const styleFill = rectStr.match(/style="[^"]*fill:\s*([^;"]+)/i);
+        if (styleFill) fill = styleFill[1];
+      }
+      if (!fill || fill === 'transparent' || fill === 'none') continue;
+
+      const classified = classifyFillColor(fill);
+      if (classified === undefined) continue; // skip transparent
+
+      // Extract x position for ordering
+      const xMatch = rectStr.match(/\bx="([^"]+)"/i);
+      const x = xMatch ? parseFloat(xMatch[1]) : 0;
+
+      rects.push({ color: classified, x });
+    }
+
+    // Sort by x position (left to right = oldest to newest)
+    rects.sort((a, b) => a.x - b.x);
+
+    const days = rects.map(r => r.color);
+
+    // Try to find uptime percentage near the service name
+    const nearbyText = html.slice(nameIdx, Math.min(nameIdx + 800, boundIdx));
+    const pctMatch = nearbyText.match(/(\d{1,3}(?:\.\d{1,4})?)\s*%/);
+    const uptime_pct = pctMatch ? parseFloat(pctMatch[1]) : null;
+
+    console.log(`  Deterministic: ${name}: ${days.length} bars, ${days.filter(d => d === false).length} incidents, uptime: ${uptime_pct}%`);
+    result.set(name, { uptime_pct, uptime_days: days.length > 0 ? days : null });
+  }
+
+  progress(`Deterministic parse: matched ${result.size}/${serviceNames.length} services`);
+  return result;
 }
 
 const UPTIME_SYSTEM_PROMPT = `You extract uptime bar data from status page HTML. You are given a list of known service names.
@@ -499,7 +638,13 @@ CRITICAL RULES:
 
   const serviceNames = flatServices.map((s) => s.name);
 
-  const uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
+  let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>;
+  if (startDate2) {
+    progress("Date anchor found — using deterministic SVG rect parsing...");
+    uptimeMap = parseSvgDeterministic(uptimeHtml, serviceNames, progress);
+  } else {
+    uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
+  }
 
   const mergedServices: ExtractedService[] = flatServices.map((s) => {
     const uptime = uptimeMap.get(s.name);
