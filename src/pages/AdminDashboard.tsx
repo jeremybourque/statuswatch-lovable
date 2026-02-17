@@ -126,7 +126,7 @@ const AdminDashboard = () => {
                 Clone from URL
               </Button>
             </Link>
-            <Link to="/admin/new">
+            <Link to="/admin/new?from=admin">
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
                 Add Page

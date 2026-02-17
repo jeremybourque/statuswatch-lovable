@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, Plus, Loader2, ArrowLeft } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,9 @@ function slugify(text: string) {
 const AdminNewPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get("from");
+  const backTo = from === "admin" ? "/admin" : "/";
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -62,7 +65,7 @@ const AdminNewPage = () => {
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">New Status Page</h1>
-          <Link to="/admin" className="ml-auto">
+          <Link to={backTo} className="ml-auto">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
