@@ -45,7 +45,7 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
   return (
     <div className="flex items-center justify-between border border-border rounded-lg bg-card px-4 py-3">
       <div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <Link to={`/${page.slug}`} className="text-sm font-semibold text-card-foreground hover:underline">
             {page.name}
           </Link>
