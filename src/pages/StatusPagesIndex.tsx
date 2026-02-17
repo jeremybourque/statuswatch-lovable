@@ -68,6 +68,16 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
   );
 }
 
+const CARD_HEIGHTS = [120, 252, 384] as const;
+
+function getCardHeight(serviceCount: number): number {
+  const columns = Math.min(serviceCount, 12);
+  const rows = columns > 0 ? Math.ceil(serviceCount / columns) : 0;
+  // Approximate content height: header(32) + dots(24 padding + rows*18) + footer(28) + padding(32) + top bar(4)
+  const estimated = 32 + 24 + rows * 18 + 28 + 32 + 4;
+  return CARD_HEIGHTS.find((h) => h >= estimated) ?? CARD_HEIGHTS[CARD_HEIGHTS.length - 1];
+}
+
 function StatusPageCard({ page }: { page: { id: string; name: string; slug: string; description: string | null } }) {
   const { data: services = [] } = usePageServices(page.id);
   const statuses = services.map((s) => s.status);
@@ -77,11 +87,13 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   else if (statuses.some((s) => s === "degraded")) overall = "degraded";
   else if (statuses.some((s) => s === "maintenance")) overall = "maintenance";
   const config = statusConfig[overall];
+  const cardHeight = getCardHeight(services.length);
 
   return (
     <Link
       to={`/${page.slug}`}
       className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden break-inside-avoid mb-3"
+      style={{ height: `${cardHeight}px` }}
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${config.bgClass}`} />
 
