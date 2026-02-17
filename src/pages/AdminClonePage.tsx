@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, ArrowLeft, Loader2, Globe, Plus, Check, ChevronDown, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { StatusBanner } from "@/components/StatusBanner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
               />
             </div>
             {service.uptime_pct != null && (
-              <span className="font-mono text-sm text-muted-foreground shrink-0">
+              <span className="text-xs font-medium text-muted-foreground shrink-0">
                 {service.uptime_pct}%
               </span>
             )}
@@ -164,7 +165,10 @@ function ExtractedServicesList({ services, startDate }: { services: ExtractedSer
 
   return (
     <div className="space-y-6">
-      <Label className="text-sm">Services ({services.length})</Label>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold text-foreground">Services</h2>
+        <span className="text-xs text-muted-foreground font-mono">90-day uptime</span>
+      </div>
       {sections.map((section, i) => {
         if (section.type === "group") {
           return <ExtractedServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} startDate={startDate} />;
@@ -510,6 +514,10 @@ const AdminClonePage = () => {
         {extracted && (
           <section className="border border-border rounded-xl bg-card p-6 space-y-4">
             <h2 className="text-lg font-semibold text-card-foreground">Preview</h2>
+
+            {extracted.services?.length > 0 && (
+              <StatusBanner status={getGroupStatus(extracted.services)} />
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
