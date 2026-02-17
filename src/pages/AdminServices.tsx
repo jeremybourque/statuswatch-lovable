@@ -4,6 +4,7 @@ import { useStatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, AlertTriangle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -571,136 +572,140 @@ const AdminServices = () => {
           Status page not found.
         </div>
       ) : (
-        <main className="max-w-4xl mx-auto px-4 py-8 space-y-10">
-          {/* ── Page Details ── */}
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">Page Details</h2>
-            <PageDetailsSection page={page} />
-          </section>
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <Tabs defaultValue="details">
+            <TabsList className="mb-6">
+              <TabsTrigger value="details">Page Details</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
+              <TabsTrigger value="incidents">Incidents</TabsTrigger>
+            </TabsList>
 
-          {/* ── Services ── */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Services</h2>
-              {!showAddService && (
-                <Button size="sm" onClick={() => setShowAddService(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Service
-                </Button>
+            <TabsContent value="details" className="space-y-3">
+              <PageDetailsSection page={page} />
+            </TabsContent>
+
+            <TabsContent value="services" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground">Services</h2>
+                {!showAddService && (
+                  <Button size="sm" onClick={() => setShowAddService(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Service
+                  </Button>
+                )}
+              </div>
+
+              {showAddService && (
+                <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Name</Label>
+                      <Input placeholder="e.g. API Server" value={addingName} onChange={(e) => setAddingName(e.target.value)} autoFocus />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Status</Label>
+                      <Select value={addingStatus} onValueChange={setAddingStatus}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={handleAddService} disabled={creatingService || !addingName.trim()}>
+                      {creatingService ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                      Add
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowAddService(false)}>
+                      <X className="h-3.5 w-3.5 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               )}
-            </div>
 
-            {showAddService && (
-              <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Name</Label>
-                    <Input placeholder="e.g. API Server" value={addingName} onChange={(e) => setAddingName(e.target.value)} autoFocus />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Status</Label>
-                    <Select value={addingStatus} onValueChange={setAddingStatus}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {services.length === 0 && !showAddService ? (
+                <p className="text-muted-foreground text-sm">No services yet. Add one to get started.</p>
+              ) : (
+                <div className="space-y-2">
+                  {services.map((service) => (
+                    <EditableService key={service.id} service={service} onDelete={handleDeleteService} />
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={handleAddService} disabled={creatingService || !addingName.trim()}>
-                    {creatingService ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-                    Add
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddService(false)}>
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {services.length === 0 && !showAddService ? (
-              <p className="text-muted-foreground text-sm">No services yet. Add one to get started.</p>
-            ) : (
-              <div className="space-y-2">
-                {services.map((service) => (
-                  <EditableService key={service.id} service={service} onDelete={handleDeleteService} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── Incidents ── */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Incidents
-              </h2>
-              {!showAddIncident && (
-                <Button size="sm" onClick={() => setShowAddIncident(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Incident
-                </Button>
               )}
-            </div>
+            </TabsContent>
 
-            {showAddIncident && (
-              <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Title</Label>
-                  <Input placeholder="e.g. API degraded performance" value={incidentTitle} onChange={(e) => setIncidentTitle(e.target.value)} autoFocus />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Status</Label>
-                    <Select value={incidentStatus} onValueChange={setIncidentStatus}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {INCIDENT_STATUS_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Impact</Label>
-                    <Select value={incidentImpact} onValueChange={setIncidentImpact}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {INCIDENT_IMPACT_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={handleAddIncident} disabled={creatingIncident || !incidentTitle.trim()}>
-                    {creatingIncident ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-                    Add
+            <TabsContent value="incidents" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Incidents
+                </h2>
+                {!showAddIncident && (
+                  <Button size="sm" onClick={() => setShowAddIncident(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Incident
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddIncident(false)}>
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    Cancel
-                  </Button>
-                </div>
+                )}
               </div>
-            )}
 
-            {incidents.length === 0 && !showAddIncident ? (
-              <p className="text-muted-foreground text-sm">No incidents yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {incidents.map((incident) => (
-                  <EditableIncident key={incident.id} incident={incident} onDelete={handleDeleteIncident} />
-                ))}
-              </div>
-            )}
-          </section>
+              {showAddIncident && (
+                <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Title</Label>
+                    <Input placeholder="e.g. API degraded performance" value={incidentTitle} onChange={(e) => setIncidentTitle(e.target.value)} autoFocus />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Status</Label>
+                      <Select value={incidentStatus} onValueChange={setIncidentStatus}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {INCIDENT_STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Impact</Label>
+                      <Select value={incidentImpact} onValueChange={setIncidentImpact}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {INCIDENT_IMPACT_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={handleAddIncident} disabled={creatingIncident || !incidentTitle.trim()}>
+                      {creatingIncident ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                      Add
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowAddIncident(false)}>
+                      <X className="h-3.5 w-3.5 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {incidents.length === 0 && !showAddIncident ? (
+                <p className="text-muted-foreground text-sm">No incidents yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {incidents.map((incident) => (
+                    <EditableIncident key={incident.id} incident={incident} onDelete={handleDeleteIncident} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </main>
       )}
     </div>
