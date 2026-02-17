@@ -61,10 +61,7 @@ function usePageServices(pageId: string) {
 function ServiceDots({ services }: { services: { name: string; status: ServiceStatus }[] }) {
   const columns = Math.min(services.length, 12);
   return (
-    <div
-      className="grid gap-1.5 justify-center"
-      style={{ gridTemplateColumns: `repeat(${columns}, min-content)` }}
-    >
+    <div className="grid gap-1.5 justify-center" style={{ gridTemplateColumns: `repeat(${columns}, min-content)` }}>
       {services.map((s, i) => {
         const config = statusConfig[s.status];
         const isOperational = s.status === "operational";
@@ -151,7 +148,11 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   );
 }
 
-function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug: string; description: string | null }[] }) {
+function BalancedStatusGrid({
+  pages,
+}: {
+  pages: { id: string; name: string; slug: string; description: string | null }[];
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cols = useColumnCount(containerRef, 240, 12);
 
@@ -161,7 +162,10 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
       const { data, error } = await supabase
         .from("services")
         .select("status_page_id")
-        .in("status_page_id", pages.map((p) => p.id));
+        .in(
+          "status_page_id",
+          pages.map((p) => p.id),
+        );
       if (error) throw error;
       const counts: Record<string, number> = {};
       for (const row of data ?? []) {
@@ -175,14 +179,14 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
   const columns = useMemo(() => {
     if (!serviceCounts) {
       // Before counts load, distribute round-robin to avoid all-in-one-column
-      const buckets: typeof pages[] = Array.from({ length: cols }, () => []);
+      const buckets: (typeof pages)[] = Array.from({ length: cols }, () => []);
       pages.forEach((p, i) => buckets[i % cols].push(p));
       return buckets;
     }
     // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
-    const weight = (p: typeof pages[0]) => {
+    const weight = (p: (typeof pages)[0]) => {
       const count = serviceCounts[p.id] ?? 0;
-      return Math.ceil(count / 12) + 2;
+      return Math.ceil(count / 12) + 4;
     };
     return balanceColumns(pages, cols, weight);
   }, [pages, cols, serviceCounts]);
