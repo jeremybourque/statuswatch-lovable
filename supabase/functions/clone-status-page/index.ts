@@ -339,6 +339,7 @@ async function fetchRenderedHTML(url: string): Promise<string> {
     body: JSON.stringify({
       url,
       formats: ["html"],
+      onlyMainContent: false,
       waitFor: 5000,
       actions: [
         { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
@@ -379,6 +380,7 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
     body: JSON.stringify({
       url,
       formats: ["rawHtml"],
+      onlyMainContent: false,
       waitFor: 5000,
       actions: [
         { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
