@@ -95,6 +95,11 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       uptime_days: null,
     }));
 
+    if (services.length === 0) {
+      progress("No services found via API");
+      return { name: pageName, services: [], incidents: [], start_date: null };
+    }
+
     progress(`Found ${services.length} components via API`);
 
     // Scrape the HTML page to extract uptime bar data from SVGs
@@ -770,6 +775,10 @@ CRITICAL RULES:
   const totalChildren = flatServices.length;
   const totalParents = (pass1.services || []).filter((s: any) => s.children?.length > 0).length;
   progress(`AI found ${totalChildren} services under ${totalParents} parent groups`);
+
+  if (totalChildren === 0) {
+    return { name: pass1.name, services: [], incidents: [], start_date: null };
+  }
 
   const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
   const startDate = sinceMatch ? sinceMatch[1] : null;
