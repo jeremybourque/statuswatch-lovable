@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { statusConfig, type ServiceStatus } from "@/lib/statusData";
 import { UptimeBar } from "@/components/UptimeBar";
+import { IncidentTimeline } from "@/components/IncidentTimeline";
+import type { Incident } from "@/lib/statusData";
 
 interface ExtractedService {
   name: string;
@@ -19,9 +21,18 @@ interface ExtractedService {
   uptime_days?: (boolean | null)[] | null;
 }
 
+interface ExtractedIncident {
+  title: string;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  impact: ServiceStatus;
+  created_at: string;
+  updates: { status: string; message: string; timestamp: string }[];
+}
+
 interface ExtractedData {
   name: string;
   services: ExtractedService[];
+  incidents: ExtractedIncident[];
   start_date: string | null;
 }
 
@@ -324,7 +335,8 @@ const AdminClonePage = () => {
         const uniqueSlug = await findUniqueSlug(baseSlug);
         setSlug(uniqueSlug);
       }
-      toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services.` });
+      const incidentCount = result.incidents?.length ?? 0;
+      toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services and ${incidentCount} incidents.` });
     } catch (err: any) {
       setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
       addLog(err.message || "Analysis failed", "error");
@@ -451,6 +463,38 @@ const AdminClonePage = () => {
         }
       }
 
+      // Create incidents and their updates
+      if (extracted.incidents?.length > 0) {
+        for (const inc of extracted.incidents) {
+          const { data: createdInc, error: incErr } = await supabase
+            .from("incidents")
+            .insert({
+              status_page_id: page.id,
+              title: inc.title,
+              status: inc.status,
+              impact: inc.impact,
+              created_at: inc.created_at,
+            })
+            .select("id")
+            .single();
+          if (incErr) {
+            console.error("Failed to insert incident:", incErr);
+            continue;
+          }
+
+          if (inc.updates.length > 0) {
+            const updateRows = inc.updates.map((u) => ({
+              incident_id: createdInc.id,
+              status: u.status,
+              message: u.message,
+              created_at: u.timestamp,
+            }));
+            const { error: uErr } = await supabase.from("incident_updates").insert(updateRows);
+            if (uErr) console.error("Failed to insert incident updates:", uErr);
+          }
+        }
+      }
+
       toast({ title: "Status page cloned!" });
       navigate("/admin");
     } catch (err: any) {
@@ -542,6 +586,21 @@ const AdminClonePage = () => {
 
             {extracted.services?.length > 0 && (
               <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
+            )}
+
+            {extracted.incidents?.length > 0 && (
+              <IncidentTimeline incidents={extracted.incidents.map((inc) => ({
+                id: inc.title,
+                title: inc.title,
+                status: inc.status,
+                impact: inc.impact,
+                createdAt: inc.created_at,
+                updates: inc.updates.map((u) => ({
+                  status: u.status as Incident["status"],
+                  message: u.message,
+                  timestamp: u.timestamp,
+                })),
+              }))} />
             )}
 
             <Button

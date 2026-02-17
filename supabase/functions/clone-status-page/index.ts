@@ -16,9 +16,24 @@ interface ExtractedService {
   uptime_days?: (boolean | null)[] | null;
 }
 
+interface ExtractedIncidentUpdate {
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  message: string;
+  timestamp: string;
+}
+
+interface ExtractedIncident {
+  title: string;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  impact: ServiceStatus;
+  created_at: string;
+  updates: ExtractedIncidentUpdate[];
+}
+
 interface ExtractedResult {
   name: string;
   services: ExtractedService[];
+  incidents: ExtractedIncident[];
   start_date: string | null;
 }
 
@@ -135,11 +150,87 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       console.log("Could not scrape uptime bars:", e.message);
     }
 
-    return { name: pageName, services, start_date: startDate };
+    // Fetch incidents from API
+    let incidents: ExtractedIncident[] = [];
+    try {
+      progress("Fetching incidents from API...");
+      incidents = await fetchIncidentsFromAPI(origin, progress);
+      progress(`Found ${incidents.length} incidents via API`);
+    } catch (e: any) {
+      progress(`Could not fetch incidents: ${e.message}`);
+    }
+
+    return { name: pageName, services, incidents, start_date: startDate };
   } catch (e) {
     console.log("Statuspage API not available:", e.message);
     return null;
   }
+}
+
+// ── Incident extraction via Atlassian API ──
+
+function mapIncidentStatus(status: string): ExtractedIncident["status"] {
+  switch (status) {
+    case "investigating": return "investigating";
+    case "identified": return "identified";
+    case "monitoring": return "monitoring";
+    case "resolved": return "resolved";
+    case "postmortem": return "resolved";
+    default: return "investigating";
+  }
+}
+
+function mapIncidentImpact(impact: string): ServiceStatus {
+  switch (impact) {
+    case "none": return "operational";
+    case "minor": return "degraded";
+    case "major": return "partial";
+    case "critical": return "major";
+    case "maintenance": return "maintenance";
+    default: return "major";
+  }
+}
+
+async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<ExtractedIncident[]> {
+  // Fetch both unresolved and recent resolved incidents
+  const [unresolvedRes, resolvedRes] = await Promise.all([
+    fetch(`${origin}/api/v2/incidents/unresolved.json`, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+    }),
+    fetch(`${origin}/api/v2/incidents.json`, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+    }),
+  ]);
+
+  const allIncidents: ExtractedIncident[] = [];
+  const seenIds = new Set<string>();
+
+  const parseIncidents = (data: any) => {
+    for (const inc of (data?.incidents || [])) {
+      if (seenIds.has(inc.id)) continue;
+      seenIds.add(inc.id);
+      const updates: ExtractedIncidentUpdate[] = (inc.incident_updates || []).map((u: any) => ({
+        status: mapIncidentStatus(u.status),
+        message: u.body || "",
+        timestamp: u.created_at || u.updated_at || inc.created_at,
+      }));
+      allIncidents.push({
+        title: inc.name,
+        status: mapIncidentStatus(inc.status),
+        impact: mapIncidentImpact(inc.impact),
+        created_at: inc.created_at,
+        updates,
+      });
+    }
+  };
+
+  if (unresolvedRes.ok) parseIncidents(await unresolvedRes.json());
+  if (resolvedRes.ok) parseIncidents(await resolvedRes.json());
+
+  // Sort newest first
+  allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return allIncidents;
 }
 
 // ── HTML fetching ──
@@ -554,6 +645,60 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
   return html;
 }
 
+const INCIDENT_SYSTEM_PROMPT = `You extract incident data from a status page HTML. Look for incident history, past incidents, and any current ongoing incidents.
+
+Return ONLY valid JSON:
+{
+  "incidents": [
+    {
+      "title": "Incident title",
+      "status": "investigating|identified|monitoring|resolved",
+      "impact": "operational|degraded|partial|major|maintenance",
+      "created_at": "ISO 8601 timestamp or date string",
+      "updates": [
+        { "status": "investigating|identified|monitoring|resolved", "message": "Update text", "timestamp": "ISO 8601 timestamp" }
+      ]
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. Extract ALL incidents shown on the page, both current/ongoing and historical/past.
+2. Each incident should have all its timeline updates in chronological order (newest first).
+3. Map impact: minor/degraded → "degraded", major/partial → "partial", critical/outage → "major", maintenance → "maintenance".
+4. If no timestamp is available for an update, use the incident's created_at.
+5. If you cannot determine exact timestamps, use reasonable ISO 8601 dates based on relative text like "2 days ago".
+6. Return an empty incidents array if no incidents are found.`;
+
+async function extractIncidentsViaAI(
+  apiKey: string,
+  html: string,
+  progress: ProgressFn,
+): Promise<ExtractedIncident[]> {
+  progress("Sending HTML to AI for incident extraction...");
+
+  const result = await callAI(
+    apiKey,
+    INCIDENT_SYSTEM_PROMPT,
+    "Extract all incidents (current and historical) from this status page HTML:",
+    html
+  );
+
+  const incidents: ExtractedIncident[] = (result.incidents || []).map((inc: any) => ({
+    title: inc.title || "Untitled Incident",
+    status: inc.status || "resolved",
+    impact: inc.impact || "major",
+    created_at: inc.created_at || new Date().toISOString(),
+    updates: (inc.updates || []).map((u: any) => ({
+      status: u.status || "investigating",
+      message: u.message || "",
+      timestamp: u.timestamp || inc.created_at || new Date().toISOString(),
+    })),
+  }));
+
+  return incidents;
+}
+
 async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn): Promise<ExtractedResult> {
   progress("Fetching page HTML...");
   let rawHtml: string;
@@ -666,7 +811,17 @@ CRITICAL RULES:
   }
   progress(`Parsed uptime bars for ${matchedCount}/${mergedServices.length} services`);
 
-  return { name: pass1.name, services: mergedServices, start_date: startDate2 };
+  // Extract incidents via AI
+  let incidents: ExtractedIncident[] = [];
+  try {
+    progress("Extracting incidents from page...");
+    incidents = await extractIncidentsViaAI(apiKey, servicesHtml, progress);
+    progress(`Found ${incidents.length} incidents`);
+  } catch (e: any) {
+    progress(`Could not extract incidents: ${e.message}`);
+  }
+
+  return { name: pass1.name, services: mergedServices, incidents, start_date: startDate2 };
 }
 
 Deno.serve(async (req) => {
