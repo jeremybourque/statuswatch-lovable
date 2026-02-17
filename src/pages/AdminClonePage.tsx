@@ -97,11 +97,9 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
                 startDate={computeStartDateFor90(startDate, service.uptime_days)}
               />
             </div>
-            {service.uptime_pct != null && (
-              <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-14 text-right">
-                {service.uptime_pct?.toFixed(2)}%
-              </span>
-            )}
+            <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-14 text-right">
+              {service.uptime_pct != null ? `${service.uptime_pct.toFixed(2)}%` : ""}
+            </span>
           </div>
         </div>
       )}
