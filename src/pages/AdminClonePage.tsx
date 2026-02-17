@@ -51,7 +51,18 @@ function ExtractedStatusDot({ status }: { status: ServiceStatus }) {
   );
 }
 
-function ExtractedServiceItem({ service }: { service: ExtractedService }) {
+function computeStartDateFor90(sourceStartDate: string | null | undefined, uptimeDays: (boolean | null)[] | null | undefined): string | null | undefined {
+  const days = uptimeDays && uptimeDays.length > 0 ? uptimeDays : [];
+  const dataLen = Math.min(days.length, 90);
+  const pad = 90 - dataLen;
+  if (!sourceStartDate || pad === 0) return sourceStartDate;
+  const [y, m, d] = sourceStartDate.split("-").map(Number);
+  const anchor = new Date(y, m - 1, d);
+  anchor.setDate(anchor.getDate() - pad);
+  return `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
+}
+
+function ExtractedServiceItem({ service, startDate }: { service: ExtractedService; startDate?: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const config = statusConfig[service.status] ?? statusConfig.operational;
 
@@ -74,13 +85,16 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
             <div className="flex-1 min-w-0">
-              <UptimeBar days={(() => {
-                const days = service.uptime_days && service.uptime_days.length > 0
-                  ? service.uptime_days
-                  : [];
-                if (days.length >= 90) return days.slice(-90);
-                return [...Array(90 - days.length).fill(null), ...days];
-              })()} />
+              <UptimeBar
+                days={(() => {
+                  const days = service.uptime_days && service.uptime_days.length > 0
+                    ? service.uptime_days
+                    : [];
+                  if (days.length >= 90) return days.slice(-90);
+                  return [...Array(90 - days.length).fill(null), ...days];
+                })()}
+                startDate={computeStartDateFor90(startDate, service.uptime_days)}
+              />
             </div>
             {service.uptime_pct != null && (
               <span className="font-mono text-sm text-muted-foreground shrink-0">
@@ -94,7 +108,7 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
   );
 }
 
-function ExtractedServiceGroup({ groupName, services }: { groupName: string; services: ExtractedService[] }) {
+function ExtractedServiceGroup({ groupName, services, startDate }: { groupName: string; services: ExtractedService[]; startDate?: string | null }) {
   const [collapsed, setCollapsed] = useState(false);
   const groupStatus = getGroupStatus(services);
   const config = statusConfig[groupStatus] ?? statusConfig.operational;
@@ -120,7 +134,7 @@ function ExtractedServiceGroup({ groupName, services }: { groupName: string; ser
         <div className="space-y-0 border border-border rounded-lg overflow-hidden">
           {services.map((s, i) => (
             <div key={i} className={i !== services.length - 1 ? "border-b border-border" : ""}>
-              <ExtractedServiceItem service={s} />
+              <ExtractedServiceItem service={s} startDate={startDate} />
             </div>
           ))}
         </div>
@@ -129,7 +143,7 @@ function ExtractedServiceGroup({ groupName, services }: { groupName: string; ser
   );
 }
 
-function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
+function ExtractedServicesList({ services, startDate }: { services: ExtractedService[]; startDate?: string | null }) {
   // Build ordered sections preserving source order: groups stay together, ungrouped rendered inline
   type Section = { type: "group"; name: string; services: ExtractedService[] } | { type: "ungrouped"; service: ExtractedService };
   const sections: Section[] = [];
@@ -153,12 +167,12 @@ function ExtractedServicesList({ services }: { services: ExtractedService[] }) {
       <Label className="text-sm">Services ({services.length})</Label>
       {sections.map((section, i) => {
         if (section.type === "group") {
-          return <ExtractedServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
+          return <ExtractedServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} startDate={startDate} />;
         }
         
         return (
           <div key={`svc-${i}`} className="space-y-0 border border-border rounded-lg overflow-hidden">
-            <ExtractedServiceItem service={section.service} />
+            <ExtractedServiceItem service={section.service} startDate={startDate} />
           </div>
         );
       })}
@@ -521,7 +535,7 @@ const AdminClonePage = () => {
             </div>
 
             {extracted.services?.length > 0 && (
-              <ExtractedServicesList services={extracted.services} />
+              <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
             )}
 
             <Button

@@ -1,17 +1,32 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 
 interface UptimeBarProps {
   days: (boolean | null)[];
+  startDate?: string | null; // YYYY-MM-DD anchor for the first bar
 }
 
-export function UptimeBar({ days }: UptimeBarProps) {
-  const today = new Date();
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addLocalDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+export function UptimeBar({ days, startDate }: UptimeBarProps) {
+  // If startDate provided, anchor dates to it; otherwise fall back to today-based
+  const anchorDate = startDate
+    ? parseLocalDate(startDate)
+    : addLocalDays(new Date(), -(days.length - 1));
 
   return (
     <div className="flex gap-[2px] items-end">
       {days.map((up, i) => {
-        const date = subDays(today, days.length - 1 - i);
+        const date = addLocalDays(anchorDate, i);
         return (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
