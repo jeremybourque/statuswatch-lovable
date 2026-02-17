@@ -43,7 +43,7 @@ function ServiceCard({ service }: { service: Service }) {
             <div className="flex-1 min-w-0">
               <UptimeBar days={service.uptimeDays} />
             </div>
-            <span className="text-xs font-medium text-muted-foreground shrink-0">{service.uptime.toFixed(2)}%</span>
+            <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-14 text-right">{service.uptime.toFixed(2)}%</span>
           </div>
         </div>
       )}
