@@ -109,7 +109,16 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
 
       progress("Stripping non-essential markup, keeping SVG data...");
-      const uptimeHtml = stripForUptimeAggressive(rawHtml, services.map(s => s.name));
+      const uptimeHtml = rawHtml
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+        .replace(/<head[\s\S]*?<\/head>/gi, "")
+        .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+        .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/>\s+</g, "><");
 
       console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
@@ -291,54 +300,6 @@ function stripForUptime(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
-}
-
-/**
- * Strip HTML aggressively for uptime extraction while preserving all component
- * containers and their SVG uptime bars. Instead of extracting by service name
- * (which fails when names don't match HTML exactly), we remove known-useless
- * elements: images, forms, modals, tooltips, subscribe widgets, links, etc.
- */
-function stripForUptimeAggressive(html: string, _serviceNames: string[]): string {
-  let cleaned = html
-    // Remove entire blocks that are never relevant to uptime bars
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-    .replace(/<head[\s\S]*?<\/head>/gi, "")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<header[\s\S]*?<\/header>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    // Remove modals, tooltips, dropdowns, subscribe forms
-    .replace(/<div[^>]*id="[^"]*subscribe[^"]*"[\s\S]*?<\/div>/gi, "")
-    .replace(/<div[^>]*id="[^"]*modal[^"]*"[\s\S]*?<\/div>/gi, "")
-    .replace(/<div[^>]*id="[^"]*tooltip[^"]*"[\s\S]*?<\/div>/gi, "")
-    .replace(/<div[^>]*id="[^"]*dropdown[^"]*"[\s\S]*?<\/div>/gi, "")
-    // Remove images, iframes, forms, buttons, inputs
-    .replace(/<img[^>]*>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<form[\s\S]*?<\/form>/gi, "")
-    .replace(/<button[\s\S]*?<\/button>/gi, "")
-    .replace(/<input[^>]*>/gi, "")
-    .replace(/<select[\s\S]*?<\/select>/gi, "")
-    .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
-    // Remove links (but keep their text content)
-    .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, "$1")
-    // Remove all HTML attributes except: class, data-component-id, fill, x, y, width, height, rx, ry, viewBox, xmlns, style (on SVG elements)
-    // First, strip style/class/data attrs from non-SVG elements
-    .replace(/(<(?!svg|rect|g |path)[a-z][^>]*?)\s+style="[^"]*"/gi, "$1")
-    .replace(/(<(?!svg|rect|g |path)[a-z][^>]*?)\s+data-(?!component)[a-z-]+="[^"]*"/gi, "$1")
-    // Remove aria attributes
-    .replace(/\s+aria-[a-z-]+="[^"]*"/gi, "")
-    .replace(/\s+role="[^"]*"/gi, "")
-    .replace(/\s+tabindex="[^"]*"/gi, "")
-    // Collapse whitespace
-    .replace(/\s{2,}/g, " ")
-    .replace(/>\s+</g, "><");
-
-  console.log(`Aggressive strip: ${cleaned.length} chars (was ${html.length})`);
-  return cleaned;
 }
 
 // ── Deterministic SVG rect parser ──
