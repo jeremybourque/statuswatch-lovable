@@ -35,7 +35,7 @@ const StatusPageDetail = () => {
             <Activity className="h-7 w-7 text-primary" />
             <h1 className="text-xl font-bold text-foreground tracking-tight">{page.name}</h1>
           </div>
-          <Link to={`/admin/${page.slug}/services`} className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link to={`/admin/${page.slug}/services?from=status`} className="text-muted-foreground hover:text-foreground transition-colors">
             <Settings className="h-4 w-4" />
           </Link>
         </div>
