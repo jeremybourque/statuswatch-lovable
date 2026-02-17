@@ -96,7 +96,7 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
       {expanded && (
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               <UptimeBar
                 days={(() => {
                   const days = service.uptime_days && service.uptime_days.length > 0
@@ -108,7 +108,7 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
                 startDate={computeStartDateFor90(startDate, service.uptime_days)}
               />
             </div>
-            <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-14 text-right">
+            <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
               {service.uptime_pct != null ? `${service.uptime_pct.toFixed(2)}%` : ""}
             </span>
           </div>
