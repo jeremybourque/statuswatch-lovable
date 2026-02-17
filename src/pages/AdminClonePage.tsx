@@ -199,35 +199,48 @@ interface LogEntry {
   timestamp: Date;
 }
 
-function ActivityLog({ entries }: { entries: LogEntry[] }) {
+function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete: boolean }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries.length]);
 
+  useEffect(() => {
+    if (isComplete) setCollapsed(true);
+  }, [isComplete]);
+
   if (entries.length === 0) return null;
 
   return (
     <div className="border border-border rounded-lg bg-muted/30 overflow-hidden">
-      <div className="px-4 py-2 border-b border-border bg-muted/50">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activity Log</span>
-      </div>
-      <ScrollArea className="max-h-48">
-        <div className="p-3 space-y-1.5">
-          {entries.map((entry, i) => (
-            <div key={i} className="flex items-start gap-2 text-sm">
-              {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />}
-              {entry.status === "pending" && <Loader2 className="h-4 w-4 text-muted-foreground animate-spin mt-0.5 shrink-0" />}
-              {entry.status === "error" && <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
-              <span className={entry.status === "error" ? "text-destructive" : entry.status === "pending" ? "text-muted-foreground" : "text-foreground"}>
-                {entry.message}
-              </span>
-            </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between cursor-pointer"
+      >
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          {isComplete ? "Complete" : "Processing..."}
+        </span>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+      </button>
+      {!collapsed && (
+        <ScrollArea className="max-h-48">
+          <div className="p-3 space-y-1.5">
+            {entries.map((entry, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm">
+                {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />}
+                {entry.status === "pending" && <Loader2 className="h-4 w-4 text-muted-foreground animate-spin mt-0.5 shrink-0" />}
+                {entry.status === "error" && <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
+                <span className={entry.status === "error" ? "text-destructive" : entry.status === "pending" ? "text-muted-foreground" : "text-foreground"}>
+                  {entry.message}
+                </span>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }
@@ -825,7 +838,7 @@ export function ClonePageContent() {
           Paste a public status page URL to extract its services and create a copy.
         </p>
 
-        {logEntries.length > 0 && <ActivityLog entries={logEntries} />}
+        {logEntries.length > 0 && <ActivityLog entries={logEntries} isComplete={!fetching} />}
       </section>
 
       {/* Preview extracted data */}
