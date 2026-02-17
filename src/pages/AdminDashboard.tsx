@@ -1,6 +1,6 @@
 import { useStatusPages, type StatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Server, Globe } from "lucide-react";
+import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Server, Globe, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,11 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
         <Link to={`/admin/${page.slug}/services?tab=services`}>
           <Button variant="ghost" size="icon" title="Edit services">
             <Server className="h-4 w-4" />
+          </Button>
+        </Link>
+        <Link to={`/admin/${page.slug}/services?tab=incidents`}>
+          <Button variant="ghost" size="icon" title="Edit incidents">
+            <AlertTriangle className="h-4 w-4" />
           </Button>
         </Link>
         <Button
