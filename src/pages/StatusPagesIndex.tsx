@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 function usePageServices(pageId: string) {
   return useQuery({
@@ -81,7 +82,7 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   return (
     <Link
       to={`/${page.slug}`}
-      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden break-inside-avoid mb-3"
+      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden"
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${config.bgClass}`} />
 
@@ -116,6 +117,77 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   );
 }
 
+function MasonryGrid({ children }: { children: React.ReactNode[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [positions, setPositions] = useState<{ x: number; y: number }[]>([]);
+  const [containerHeight, setContainerHeight] = useState(0);
+  const gap = 12;
+
+  const layout = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const items = Array.from(container.children) as HTMLElement[];
+    if (items.length === 0) return;
+
+    const containerWidth = container.offsetWidth;
+    const minColWidth = 180;
+    const cols = Math.max(2, Math.min(4, Math.floor((containerWidth + gap) / (minColWidth + gap))));
+    const colWidth = (containerWidth - gap * (cols - 1)) / cols;
+    const colHeights = new Array(cols).fill(0);
+    const newPositions: { x: number; y: number }[] = [];
+
+    for (const item of items) {
+      // Place in shortest column
+      const shortest = colHeights.indexOf(Math.min(...colHeights));
+      const x = shortest * (colWidth + gap);
+      const y = colHeights[shortest];
+
+      item.style.width = `${colWidth}px`;
+      newPositions.push({ x, y });
+      colHeights[shortest] += item.offsetHeight + gap;
+    }
+
+    setPositions(newPositions);
+    setContainerHeight(Math.max(...colHeights));
+  }, []);
+
+  useEffect(() => {
+    // Run layout after render + images/fonts settle
+    const raf = requestAnimationFrame(() => {
+      layout();
+      // Re-layout after a short delay to catch async content
+      setTimeout(layout, 300);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [children.length, layout]);
+
+  useEffect(() => {
+    const observer = new ResizeObserver(() => layout());
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [layout]);
+
+  return (
+    <div ref={containerRef} className="relative" style={{ height: containerHeight || "auto" }}>
+      {children.map((child, i) => (
+        <div
+          key={i}
+          className="absolute transition-all duration-300 ease-out"
+          style={{
+            transform: positions[i]
+              ? `translate(${positions[i].x}px, ${positions[i].y}px)`
+              : undefined,
+            opacity: positions[i] ? 1 : 0,
+          }}
+        >
+          {child}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const StatusPagesIndex = () => {
   const { data: pages = [], isLoading } = useStatusPages();
 
@@ -143,11 +215,11 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+          <MasonryGrid>
             {pages.map((page) => (
               <StatusPageCard key={page.id} page={page} />
             ))}
-          </div>
+          </MasonryGrid>
         )}
       </main>
 
