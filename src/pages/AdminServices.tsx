@@ -670,6 +670,7 @@ function EditableIncident({
 const AdminServices = () => {
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "details";
+  const from = searchParams.get("from");
 
   const { slug } = useParams<{ slug: string }>();
   const { data: page, isLoading: pageLoading } = useStatusPage(slug ?? "");
@@ -791,7 +792,7 @@ const AdminServices = () => {
               <Trash2 className="h-4 w-4 mr-1" />
               Delete Page
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(from === "status" ? `/${slug}` : "/admin")}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
