@@ -36,7 +36,7 @@ const AdminNewPage = () => {
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
           >
             <AlertTriangle className="h-8 w-8 text-destructive" />
-            I need a status page for my active incident <em>fast</em>!
+            I need a status page for my active incident <em>fast</em>
           </Button>
         </div>
       </main>
