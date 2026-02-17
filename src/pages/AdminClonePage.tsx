@@ -830,58 +830,85 @@ export function ClonePageContent() {
 
       {/* Preview extracted data */}
       {extracted && (
-        <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-card-foreground">Preview</h2>
-
-          {extracted.services?.length > 0 && (
-            <StatusBanner status={getGroupStatus(extracted.services)} />
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="clone-name">Name</Label>
-              <Input
-                id="clone-name"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-              />
+        <>
+          {/* Name/slug config */}
+          <section className="border border-border rounded-xl bg-card p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-card-foreground">Page Settings</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="clone-name">Name</Label>
+                <Input
+                  id="clone-name"
+                  value={name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clone-slug">Slug</Label>
+                <Input
+                  id="clone-slug"
+                  value={slug}
+                  onChange={(e) => {
+                    setSlugManual(true);
+                    setSlug(slugify(e.target.value));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="clone-slug">Slug</Label>
-              <Input
-                id="clone-slug"
-                value={slug}
-                onChange={(e) => {
-                  setSlugManual(true);
-                  setSlug(slugify(e.target.value));
-                }}
-              />
-              <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
+          </section>
+
+          {/* Status page preview — mirrors StatusPageDetail layout */}
+          <section className="border border-border rounded-xl overflow-hidden">
+            <header className="border-b border-border bg-card">
+              <div className="px-4 py-6 flex items-center gap-3">
+                <Activity className="h-7 w-7 text-primary" />
+                <h1 className="text-xl font-bold text-foreground tracking-tight">{name || "Untitled"}</h1>
+              </div>
+            </header>
+
+            <div className="bg-background px-4 py-8 space-y-8">
+              {extracted.services?.length > 0 && (
+                <>
+                  <StatusBanner status={getGroupStatus(extracted.services)} />
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-xl font-semibold text-foreground">Services</h2>
+                      <span className="text-xs text-muted-foreground font-mono">90-day uptime</span>
+                    </div>
+                    <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
+                  </div>
+                </>
+              )}
+
+              {extracted.incidents?.length > 0 && (
+                <IncidentTimeline incidents={extracted.incidents.map((inc) => ({
+                  id: inc.title,
+                  title: inc.title,
+                  status: inc.status,
+                  impact: inc.impact,
+                  createdAt: inc.created_at,
+                  updates: inc.updates.map((u) => ({
+                    status: u.status as Incident["status"],
+                    message: u.message,
+                    timestamp: u.timestamp,
+                  })),
+                }))} />
+              )}
             </div>
-          </div>
 
-          {extracted.services?.length > 0 && (
-            <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
-          )}
-
-          {extracted.incidents?.length > 0 && (
-            <IncidentTimeline incidents={extracted.incidents.map((inc) => ({
-              id: inc.title,
-              title: inc.title,
-              status: inc.status,
-              impact: inc.impact,
-              createdAt: inc.created_at,
-              updates: inc.updates.map((u) => ({
-                status: u.status as Incident["status"],
-                message: u.message,
-                timestamp: u.timestamp,
-              })),
-            }))} />
-          )}
+            <footer className="border-t border-border bg-background">
+              <div className="px-4 py-6 flex items-center justify-between text-sm text-muted-foreground">
+                <span>© 2026 StatusWatch</span>
+                <span className="font-mono text-xs">Preview</span>
+              </div>
+            </footer>
+          </section>
 
           <Button
             onClick={handleCreate}
             disabled={creating || !name.trim() || !slug.trim()}
+            className="w-full"
           >
             {creating ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -890,7 +917,7 @@ export function ClonePageContent() {
             )}
             Create Status Page
           </Button>
-        </section>
+        </>
       )}
     </div>
   );
