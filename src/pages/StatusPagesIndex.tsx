@@ -29,16 +29,12 @@ function useColumnCount(containerRef: React.RefObject<HTMLElement | null>, colum
 /** Distribute items into `cols` buckets to minimize the max bucket weight (service count as proxy for height). */
 function balanceColumns<T>(items: T[], cols: number, weight: (item: T) => number): T[][] {
   const buckets: T[][] = Array.from({ length: cols }, () => []);
-  const heights = new Array(cols).fill(0);
 
-  // Sort heaviest first for better greedy packing
+  // Sort heaviest first, then distribute round-robin right-to-left
   const sorted = [...items].sort((a, b) => weight(b) - weight(a));
-  for (const item of sorted) {
-    const min = Math.min(...heights);
-    // Pick the last column with the minimum height (fills right-to-left)
-    const shortest = heights.lastIndexOf(min);
-    buckets[shortest].push(item);
-    heights[shortest] += weight(item);
+  for (let i = 0; i < sorted.length; i++) {
+    const col = (cols - 1) - (i % cols);
+    buckets[col].push(sorted[i]);
   }
   return buckets;
 }
