@@ -40,7 +40,7 @@ function ServiceCard({ service }: { service: Service }) {
       {expanded && (
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
-            <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex-1 min-w-0">
               <UptimeBar days={service.uptimeDays} />
             </div>
             <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">{service.uptime.toFixed(2)}%</span>

@@ -96,7 +96,7 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
       {expanded && (
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
-            <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex-1 min-w-0">
               <UptimeBar
                 days={(() => {
                   const days = service.uptime_days && service.uptime_days.length > 0
@@ -513,7 +513,7 @@ const AdminClonePage = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">Clone Status Page</h1>
           <Link to="/admin" className="ml-auto">
@@ -525,7 +525,7 @@ const AdminClonePage = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <ClonePageContent />
       </main>
     </div>
