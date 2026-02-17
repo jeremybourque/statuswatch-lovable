@@ -197,20 +197,11 @@ function mapIncidentImpact(impact: string): ServiceStatus {
 }
 
 async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<ExtractedIncident[]> {
-  // Fetch both unresolved and recent resolved incidents
-  const [unresolvedRes, resolvedRes] = await Promise.all([
-    fetch(`${origin}/api/v2/incidents/unresolved.json`, {
-      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
-    }),
-    fetch(`${origin}/api/v2/incidents.json`, {
-      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
-    }),
-  ]);
-
   const allIncidents: ExtractedIncident[] = [];
   const seenIds = new Set<string>();
 
   const parseIncidents = (data: any) => {
+    let added = 0;
     for (const inc of (data?.incidents || [])) {
       if (seenIds.has(inc.id)) continue;
       seenIds.add(inc.id);
@@ -226,11 +217,40 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
         created_at: inc.created_at,
         updates,
       });
+      added++;
     }
+    return added;
   };
 
-  if (unresolvedRes.ok) parseIncidents(await unresolvedRes.json());
-  if (resolvedRes.ok) parseIncidents(await resolvedRes.json());
+  // Fetch unresolved incidents
+  try {
+    const unresolvedRes = await fetch(`${origin}/api/v2/incidents/unresolved.json`, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+    });
+    if (unresolvedRes.ok) parseIncidents(await unresolvedRes.json());
+  } catch (e) {
+    console.warn("Failed to fetch unresolved incidents:", e.message);
+  }
+
+  // Paginate through all incident history pages
+  let page = 1;
+  const maxPages = 20; // safety limit
+  while (page <= maxPages) {
+    try {
+      const res = await fetch(`${origin}/api/v2/incidents.json?page=${page}&per_page=100`, {
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      const added = parseIncidents(data);
+      if (added === 0) break; // no new incidents on this page
+      progress(`Fetched incident history page ${page} (${allIncidents.length} total)...`);
+      page++;
+    } catch (e) {
+      console.warn(`Failed to fetch incidents page ${page}:`, e.message);
+      break;
+    }
+  }
 
   // Sort newest first
   allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
