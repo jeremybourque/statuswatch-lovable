@@ -29,7 +29,7 @@ const AdminNewPage = () => {
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
           >
             <FileText className="h-8 w-8 text-primary" />
-            I have a status page
+            Clone my existing status page
           </Button>
           <Button
             variant="outline"
