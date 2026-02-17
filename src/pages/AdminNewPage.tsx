@@ -65,7 +65,7 @@ const AdminNewPage = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-16">
+      <main className={`max-w-4xl mx-auto px-4 transition-all duration-500 ease-in-out ${selected ? "pt-6" : "py-16"}`}>
         <div className="max-w-2xl mx-auto">
           {/* Button list */}
           <div className="grid grid-cols-1 gap-4">
