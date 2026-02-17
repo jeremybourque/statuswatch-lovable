@@ -874,8 +874,13 @@ Deno.serve(async (req) => {
             result = await extractViaHTML(url, apiKey, progress);
           }
 
-          progress(`Analysis complete — found ${result.services?.length ?? 0} services`);
-          sendEvent("result", { success: true, data: result });
+          if (!result.services || result.services.length === 0) {
+            progress("No services found. Aborting import.");
+            sendEvent("error", { message: "No services found on the provided page. Import aborted." });
+          } else {
+            progress(`Analysis complete — found ${result.services.length} services`);
+            sendEvent("result", { success: true, data: result });
+          }
         } catch (error: any) {
           console.error("Error:", error);
           sendEvent("error", { message: error.message });
