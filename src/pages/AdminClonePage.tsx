@@ -546,6 +546,7 @@ export function ClonePageContent() {
   const [slugManual, setSlugManual] = useState(false);
   const [creating, setCreating] = useState(false);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+  const [urlCardExpanded, setUrlCardExpanded] = useState(false);
 
   const addLog = (message: string, status: LogEntry["status"] = "pending") => {
     setLogEntries((prev) => [...prev, { message, status, timestamp: new Date() }]);
@@ -806,28 +807,65 @@ export function ClonePageContent() {
     <div className="space-y-6">
       {/* URL input */}
       <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-          <Globe className="h-5 w-5" />
-          Enter Status Page URL
-        </h2>
-        <div className="flex gap-3">
-          <Input
-            placeholder="https://status.example.com"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
-            className="flex-1"
-          />
-          <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
-            {fetching ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Globe className="h-4 w-4 mr-1" />}
-            {fetching ? "Analyzing..." : "Analyze"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Paste a public status page URL to extract its services and create a copy.
-        </p>
-
-        {logEntries.length > 0 && <ActivityLog entries={logEntries} isComplete={!fetching} />}
+        {extracted && !fetching ? (
+          <>
+            <button
+              onClick={() => setUrlCardExpanded(!urlCardExpanded)}
+              className="w-full flex items-center justify-between cursor-pointer"
+            >
+              <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                <span className="truncate">{url}</span>
+              </h2>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${urlCardExpanded ? "" : "-rotate-90"}`} />
+            </button>
+            {urlCardExpanded && (
+              <>
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="https://status.example.com"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
+                    <Globe className="h-4 w-4 mr-1" />
+                    Analyze
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Paste a public status page URL to extract its services and create a copy.
+                </p>
+                {logEntries.length > 0 && <ActivityLog entries={logEntries} isComplete={!fetching} />}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Enter Status Page URL
+            </h2>
+            <div className="flex gap-3">
+              <Input
+                placeholder="https://status.example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
+                className="flex-1"
+              />
+              <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
+                {fetching ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Globe className="h-4 w-4 mr-1" />}
+                {fetching ? "Analyzing..." : "Analyze"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Paste a public status page URL to extract its services and create a copy.
+            </p>
+            {logEntries.length > 0 && <ActivityLog entries={logEntries} isComplete={!fetching} />}
+          </>
+        )}
       </section>
 
       {/* Preview extracted data */}
