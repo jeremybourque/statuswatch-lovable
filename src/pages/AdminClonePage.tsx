@@ -203,7 +203,7 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [entries.length]);
 
   if (entries.length === 0) return null;
@@ -815,7 +815,7 @@ export function ClonePageContent() {
             >
               <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                <span className="truncate">{url}</span>
+                <span className="truncate">{urlCardExpanded ? "Enter Status Page URL" : url}</span>
               </h2>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${urlCardExpanded ? "" : "-rotate-90"}`} />
             </button>
