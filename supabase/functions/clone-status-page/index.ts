@@ -720,12 +720,12 @@ async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn)
   let servicesHtml = stripForServices(rawHtml);
   console.log("Pass 1 (services) stripped HTML length:", servicesHtml.length);
 
-  if (servicesHtml.length < 200) {
+  if (servicesHtml.length < 500) {
     progress("Page appears JS-rendered, using Firecrawl...");
     rawHtml = await fetchRenderedHTML(url);
     servicesHtml = stripForServices(rawHtml);
     console.log("Firecrawl stripped HTML length:", servicesHtml.length);
-    if (servicesHtml.length < 200) {
+    if (servicesHtml.length < 500) {
       throw new Error("Could not extract content from this status page, even with JavaScript rendering.");
     }
   }
