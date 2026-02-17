@@ -308,7 +308,8 @@ function stripForServices(html: string): string {
 }
 
 function stripForUptime(html: string): string {
-  return html
+  // Phase 1: Remove obviously useless content
+  let stripped = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
@@ -316,8 +317,45 @@ function stripForUptime(html: string): string {
     .replace(/<footer[\s\S]*?<\/footer>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
+    // Remove images, iframes, forms, inputs — not relevant for uptime bars
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "")
+    .replace(/<input[^>]*>/gi, "")
+    .replace(/<button[\s\S]*?<\/button>/gi, "")
+    .replace(/<select[\s\S]*?<\/select>/gi, "")
+    .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
+    // Remove link/meta tags
+    .replace(/<link[^>]*>/gi, "")
+    .replace(/<meta[^>]*>/gi, "")
+    // Strip all attributes except fill, style, x, y, width, height, opacity, fill-opacity, class, data-name, aria-expanded
+    .replace(/<(rect|svg|g|text|path|circle|line|polyline|polygon|ellipse|use|defs|clipPath|linearGradient|stop|pattern|mask|symbol|title|desc)(\s[^>]*)?>/gi, (match, tag, attrs) => {
+      if (!attrs) return `<${tag}>`;
+      const kept: string[] = [];
+      const attrRegex = /\b(fill|style|x|y|width|height|opacity|fill-opacity|viewBox|xmlns|d|cx|cy|r|rx|ry|x1|x2|y1|y2|offset|stop-color|transform)="([^"]*)"/gi;
+      let m;
+      while ((m = attrRegex.exec(attrs)) !== null) {
+        kept.push(`${m[1]}="${m[2]}"`);
+      }
+      return `<${tag}${kept.length ? ' ' + kept.join(' ') : ''}>`;
+    })
+    // Strip non-essential attributes from all other tags
+    .replace(/<(?!rect|svg|g|text|path|circle|line|polyline|polygon|\/)([\w-]+)\s+[^>]*>/gi, (match, tag) => {
+      // Keep only data-name and aria attributes for service name matching
+      const dataName = match.match(/data-name="([^"]*)"/i);
+      const ariaLabel = match.match(/aria-label="([^"]*)"/i);
+      const extras: string[] = [];
+      if (dataName) extras.push(dataName[0]);
+      if (ariaLabel) extras.push(ariaLabel[0]);
+      return `<${tag}${extras.length ? ' ' + extras.join(' ') : ''}>`;
+    });
+
+  // Phase 2: Collapse whitespace
+  stripped = stripped
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
+
+  return stripped;
 }
 
 // ── Deterministic SVG rect parser ──
