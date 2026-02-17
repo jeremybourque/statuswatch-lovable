@@ -294,49 +294,51 @@ function stripForUptime(html: string): string {
 }
 
 /**
- * Aggressively strip HTML to only keep service name anchors and their SVG uptime bars.
- * This reduces a 1.8MB page to ~50-200KB by extracting only the relevant fragments.
+ * Strip HTML aggressively for uptime extraction while preserving all component
+ * containers and their SVG uptime bars. Instead of extracting by service name
+ * (which fails when names don't match HTML exactly), we remove known-useless
+ * elements: images, forms, modals, tooltips, subscribe widgets, links, etc.
  */
-function stripForUptimeAggressive(html: string, serviceNames: string[]): string {
-  // First do basic cleanup
+function stripForUptimeAggressive(html: string, _serviceNames: string[]): string {
   let cleaned = html
+    // Remove entire blocks that are never relevant to uptime bars
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
     .replace(/<head[\s\S]*?<\/head>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
+    .replace(/<header[\s\S]*?<\/header>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    // Remove modals, tooltips, dropdowns, subscribe forms
+    .replace(/<div[^>]*id="[^"]*subscribe[^"]*"[\s\S]*?<\/div>/gi, "")
+    .replace(/<div[^>]*id="[^"]*modal[^"]*"[\s\S]*?<\/div>/gi, "")
+    .replace(/<div[^>]*id="[^"]*tooltip[^"]*"[\s\S]*?<\/div>/gi, "")
+    .replace(/<div[^>]*id="[^"]*dropdown[^"]*"[\s\S]*?<\/div>/gi, "")
+    // Remove images, iframes, forms, buttons, inputs
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "")
+    .replace(/<button[\s\S]*?<\/button>/gi, "")
+    .replace(/<input[^>]*>/gi, "")
+    .replace(/<select[\s\S]*?<\/select>/gi, "")
+    .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
+    // Remove links (but keep their text content)
+    .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, "$1")
+    // Remove all HTML attributes except: class, data-component-id, fill, x, y, width, height, rx, ry, viewBox, xmlns, style (on SVG elements)
+    // First, strip style/class/data attrs from non-SVG elements
+    .replace(/(<(?!svg|rect|g |path)[a-z][^>]*?)\s+style="[^"]*"/gi, "$1")
+    .replace(/(<(?!svg|rect|g |path)[a-z][^>]*?)\s+data-(?!component)[a-z-]+="[^"]*"/gi, "$1")
+    // Remove aria attributes
+    .replace(/\s+aria-[a-z-]+="[^"]*"/gi, "")
+    .replace(/\s+role="[^"]*"/gi, "")
+    .replace(/\s+tabindex="[^"]*"/gi, "")
+    // Collapse whitespace
+    .replace(/\s{2,}/g, " ")
+    .replace(/>\s+</g, "><");
 
-  // For each service, extract a small window: the service name + the next SVG + uptime %
-  const fragments: string[] = [];
-  for (const name of serviceNames) {
-    const htmlName = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    let nameIdx = cleaned.indexOf(name);
-    if (nameIdx === -1) nameIdx = cleaned.indexOf(htmlName);
-    if (nameIdx === -1) continue;
-
-    // Find the next <svg after this name
-    const svgStartIdx = cleaned.indexOf('<svg', nameIdx);
-    if (svgStartIdx === -1) continue;
-
-    const svgEndIdx = cleaned.indexOf('</svg>', svgStartIdx);
-    if (svgEndIdx === -1) continue;
-
-    // Grab from 100 chars before the name (for context) through end of SVG + 200 chars (for uptime %)
-    const fragStart = Math.max(0, nameIdx - 100);
-    const fragEnd = Math.min(cleaned.length, svgEndIdx + 6 + 200);
-    fragments.push(cleaned.slice(fragStart, fragEnd));
-  }
-
-  if (fragments.length === 0) {
-    // Fallback: return the old-style stripped version
-    return cleaned.replace(/\s{2,}/g, " ").replace(/>\s+</g, "><");
-  }
-
-  const result = fragments.join("\n\n<!-- NEXT SERVICE -->\n\n");
-  console.log(`Aggressive strip: ${serviceNames.length} services → ${fragments.length} fragments, ${result.length} chars (was ${html.length})`);
-  return result;
+  console.log(`Aggressive strip: ${cleaned.length} chars (was ${html.length})`);
+  return cleaned;
 }
 
 // ── Deterministic SVG rect parser ──
