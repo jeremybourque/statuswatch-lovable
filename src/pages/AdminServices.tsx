@@ -229,12 +229,34 @@ const AdminServices = () => {
             </h1>
             <p className="text-xs text-muted-foreground">Manage services</p>
           </div>
-          <Link to="/admin" className="ml-auto">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={async () => {
+                if (!page) return;
+                if (!confirm(`Delete "${page.name}"? This will also delete all its services and cannot be undone.`)) return;
+                const { error } = await supabase.from("status_pages").delete().eq("id", page.id);
+                if (error) {
+                  toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+                  return;
+                }
+                toast({ title: `"${page.name}" deleted` });
+                queryClient.invalidateQueries({ queryKey: ["status-pages"] });
+                window.location.href = "/admin";
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete Page
             </Button>
-          </Link>
+            <Link to="/admin">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
