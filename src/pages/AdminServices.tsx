@@ -22,6 +22,17 @@ function slugify(text: string) {
     .replace(/^-|-$/g, "");
 }
 
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const offset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function fromLocalDatetime(local: string): string {
+  return new Date(local).toISOString();
+}
+
 /* ─── types & constants ─── */
 
 interface ServiceRow {
@@ -39,6 +50,7 @@ interface IncidentRow {
   status: string;
   impact: string;
   created_at: string;
+  resolved_at: string | null;
 }
 
 const STATUS_OPTIONS: { value: ServiceStatus; label: string }[] = [
@@ -88,7 +100,7 @@ function useAdminIncidents(pageId: string | undefined) {
     queryFn: async (): Promise<IncidentRow[]> => {
       const { data, error } = await supabase
         .from("incidents")
-        .select("id, title, status, impact, created_at")
+        .select("id, title, status, impact, created_at, resolved_at")
         .eq("status_page_id", pageId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -308,6 +320,7 @@ function EditableUpdate({
   const [editing, setEditing] = useState(false);
   const [editStatus, setEditStatus] = useState(update.status);
   const [editMessage, setEditMessage] = useState(update.message);
+  const [editTimestamp, setEditTimestamp] = useState(toLocalDatetime(update.created_at));
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -320,7 +333,7 @@ function EditableUpdate({
     setSaving(true);
     const { error } = await supabase
       .from("incident_updates")
-      .update({ status: editStatus, message: editMessage.trim() })
+      .update({ status: editStatus, message: editMessage.trim(), created_at: fromLocalDatetime(editTimestamp) })
       .eq("id", update.id);
     setSaving(false);
     if (error) {
@@ -341,7 +354,7 @@ function EditableUpdate({
           <p className="text-sm text-card-foreground mt-0.5">{update.message}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditStatus(update.status); setEditMessage(update.message); setEditing(true); }}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditStatus(update.status); setEditMessage(update.message); setEditTimestamp(toLocalDatetime(update.created_at)); setEditing(true); }}>
             <Pencil className="h-3 w-3" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(update.id)}>
@@ -354,16 +367,22 @@ function EditableUpdate({
 
   return (
     <div className="border border-primary/30 rounded-md bg-muted/30 px-3 py-3 space-y-2">
-      <div className="space-y-1">
-        <Label className="text-xs">Status</Label>
-        <Select value={editStatus} onValueChange={setEditStatus}>
-          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {INCIDENT_STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Status</Label>
+          <Select value={editStatus} onValueChange={setEditStatus}>
+            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {INCIDENT_STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Timestamp</Label>
+          <Input type="datetime-local" className="h-8" value={editTimestamp} onChange={(e) => setEditTimestamp(e.target.value)} />
+        </div>
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Message</Label>
@@ -507,6 +526,8 @@ function EditableIncident({
   const [editTitle, setEditTitle] = useState(incident.title);
   const [editStatus, setEditStatus] = useState(incident.status);
   const [editImpact, setEditImpact] = useState(incident.impact);
+  const [editStartTime, setEditStartTime] = useState(toLocalDatetime(incident.created_at));
+  const [editResolvedAt, setEditResolvedAt] = useState(incident.resolved_at ? toLocalDatetime(incident.resolved_at) : "");
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -515,6 +536,8 @@ function EditableIncident({
     setEditTitle(incident.title);
     setEditStatus(incident.status);
     setEditImpact(incident.impact);
+    setEditStartTime(toLocalDatetime(incident.created_at));
+    setEditResolvedAt(incident.resolved_at ? toLocalDatetime(incident.resolved_at) : "");
     setEditing(true);
     setExpanded(true);
   };
@@ -527,7 +550,13 @@ function EditableIncident({
     setSaving(true);
     const { error } = await supabase
       .from("incidents")
-      .update({ title: editTitle.trim(), status: editStatus, impact: editImpact })
+      .update({
+        title: editTitle.trim(),
+        status: editStatus,
+        impact: editImpact,
+        created_at: fromLocalDatetime(editStartTime),
+        resolved_at: editResolvedAt ? fromLocalDatetime(editResolvedAt) : null,
+      })
       .eq("id", incident.id);
     setSaving(false);
     if (error) {
@@ -596,6 +625,14 @@ function EditableIncident({
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Start Time</Label>
+          <Input type="datetime-local" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Resolved At</Label>
+          <Input type="datetime-local" value={editResolvedAt} onChange={(e) => setEditResolvedAt(e.target.value)} />
         </div>
       </div>
       <div className="flex items-center gap-2">

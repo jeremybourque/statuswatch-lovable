@@ -51,6 +51,7 @@ export type Database = {
           created_at: string
           id: string
           impact: string
+          resolved_at: string | null
           status: string
           status_page_id: string
           title: string
@@ -60,6 +61,7 @@ export type Database = {
           created_at?: string
           id?: string
           impact?: string
+          resolved_at?: string | null
           status?: string
           status_page_id: string
           title: string
@@ -69,6 +71,7 @@ export type Database = {
           created_at?: string
           id?: string
           impact?: string
+          resolved_at?: string | null
           status?: string
           status_page_id?: string
           title?: string
