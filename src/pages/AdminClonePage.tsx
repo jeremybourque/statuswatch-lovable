@@ -98,7 +98,7 @@ function ExtractedServiceItem({ service, startDate }: { service: ExtractedServic
               />
             </div>
             {service.uptime_pct != null && (
-              <span className="text-xs font-medium text-muted-foreground shrink-0">
+              <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-14 text-right">
                 {service.uptime_pct?.toFixed(2)}%
               </span>
             )}
