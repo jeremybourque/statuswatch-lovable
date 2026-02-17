@@ -81,7 +81,7 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   return (
     <Link
       to={`/${page.slug}`}
-      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden break-inside-avoid mb-3"
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${config.bgClass}`} />
 
@@ -143,7 +143,7 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
             {pages.map((page) => (
               <StatusPageCard key={page.id} page={page} />
             ))}
