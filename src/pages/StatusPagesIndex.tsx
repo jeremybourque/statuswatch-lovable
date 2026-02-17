@@ -71,11 +71,9 @@ function ServiceDots({ services }: { services: { name: string; status: ServiceSt
 const CARD_HEIGHTS = [120, 252, 384] as const;
 
 function getCardHeight(serviceCount: number): number {
-  const columns = Math.min(serviceCount, 12);
-  const rows = columns > 0 ? Math.ceil(serviceCount / columns) : 0;
-  // Approximate content height: header(32) + dots(24 padding + rows*18) + footer(28) + padding(32) + top bar(4)
-  const estimated = 32 + 24 + rows * 18 + 28 + 32 + 4;
-  return CARD_HEIGHTS.find((h) => h >= estimated) ?? CARD_HEIGHTS[CARD_HEIGHTS.length - 1];
+  if (serviceCount <= 24) return 120;
+  if (serviceCount <= 96) return 252;
+  return 384;
 }
 
 function StatusPageCard({ page }: { page: { id: string; name: string; slug: string; description: string | null } }) {
