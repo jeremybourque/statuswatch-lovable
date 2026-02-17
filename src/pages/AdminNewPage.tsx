@@ -33,10 +33,10 @@ const AdminNewPage = () => {
           </Button>
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium text-center whitespace-normal"
           >
             <AlertTriangle className="h-8 w-8 text-destructive" />
-            Need a status page for my active incident—<em>fast</em>!
+            <span>Need a status page for my active incident—<em>fast</em>!</span>
           </Button>
         </div>
       </main>
