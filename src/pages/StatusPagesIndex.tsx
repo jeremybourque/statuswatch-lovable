@@ -34,7 +34,9 @@ function balanceColumns<T>(items: T[], cols: number, weight: (item: T) => number
   // Sort heaviest first for better greedy packing
   const sorted = [...items].sort((a, b) => weight(b) - weight(a));
   for (const item of sorted) {
-    const shortest = heights.indexOf(Math.min(...heights));
+    const min = Math.min(...heights);
+    // Pick the last column with the minimum height (fills right-to-left)
+    const shortest = heights.lastIndexOf(min);
     buckets[shortest].push(item);
     heights[shortest] += weight(item);
   }
