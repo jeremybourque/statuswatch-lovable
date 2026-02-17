@@ -3,7 +3,7 @@ import { ServiceList } from "@/components/ServiceList";
 import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { getOverallStatus } from "@/lib/statusData";
 import { useServices, useIncidents, useStatusPage } from "@/hooks/useStatusData";
-import { Activity, Loader2, ArrowLeft } from "lucide-react";
+import { Activity, Loader2, ArrowLeft, Settings } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 import NotFound from "./NotFound";
 
@@ -35,7 +35,9 @@ const StatusPageDetail = () => {
             <Activity className="h-7 w-7 text-primary" />
             <h1 className="text-xl font-bold text-foreground tracking-tight">{page.name}</h1>
           </div>
-          <span className="text-sm text-muted-foreground font-mono">{page.slug}</span>
+          <Link to={`/admin/${page.slug}/services`} className="text-muted-foreground hover:text-foreground transition-colors">
+            <Settings className="h-4 w-4" />
+          </Link>
         </div>
       </header>
 
