@@ -29,12 +29,16 @@ function useColumnCount(containerRef: React.RefObject<HTMLElement | null>, colum
 /** Distribute items into `cols` buckets to minimize the max bucket weight (service count as proxy for height). */
 function balanceColumns<T>(items: T[], cols: number, weight: (item: T) => number): T[][] {
   const buckets: T[][] = Array.from({ length: cols }, () => []);
+  const heights = new Array(cols).fill(0);
 
-  // Sort heaviest first, then distribute round-robin right-to-left
+  // Sort heaviest first for better greedy packing
   const sorted = [...items].sort((a, b) => weight(b) - weight(a));
-  for (let i = 0; i < sorted.length; i++) {
-    const col = (cols - 1) - (i % cols);
-    buckets[col].push(sorted[i]);
+  for (const item of sorted) {
+    const min = Math.min(...heights);
+    // Pick the last column with the minimum height (fills right-to-left)
+    const shortest = heights.lastIndexOf(min);
+    buckets[shortest].push(item);
+    heights[shortest] += weight(item);
   }
   return buckets;
 }
@@ -170,9 +174,9 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
 
   const columns = useMemo(() => {
     if (!serviceCounts) {
-      // Before counts load, distribute round-robin right-to-left
+      // Before counts load, distribute round-robin to avoid all-in-one-column
       const buckets: typeof pages[] = Array.from({ length: cols }, () => []);
-      pages.forEach((p, i) => buckets[cols - 1 - (i % cols)].push(p));
+      pages.forEach((p, i) => buckets[i % cols].push(p));
       return buckets;
     }
     // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
