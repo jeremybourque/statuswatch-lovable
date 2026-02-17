@@ -104,7 +104,6 @@ function PageDetailsSection({
 }: {
   page: { id: string; name: string; slug: string; description: string | null };
 }) {
-  const [editing, setEditing] = useState(true);
   const [editName, setEditName] = useState(page.name);
   const [editSlug, setEditSlug] = useState(page.slug);
   const [editDesc, setEditDesc] = useState(page.description ?? "");
@@ -113,12 +112,7 @@ function PageDetailsSection({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const startEdit = () => {
-    setEditName(page.name);
-    setEditSlug(page.slug);
-    setEditDesc(page.description ?? "");
-    setEditing(true);
-  };
+  const hasChanges = editName.trim() !== page.name || editSlug !== page.slug || (editDesc.trim() || "") !== (page.description ?? "");
 
   const saveEdit = async () => {
     if (!editName.trim() || !editSlug.trim()) {
@@ -147,7 +141,6 @@ function PageDetailsSection({
       return;
     }
     toast({ title: "Page details updated!" });
-    setEditing(false);
     queryClient.invalidateQueries({ queryKey: ["status-page"] });
     queryClient.invalidateQueries({ queryKey: ["status-pages"] });
     if (newSlug !== page.slug) {
@@ -155,27 +148,8 @@ function PageDetailsSection({
     }
   };
 
-  if (!editing) {
-    return (
-      <div className="border border-border rounded-lg bg-card px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-card-foreground">{page.name}</p>
-            <p className="text-xs text-muted-foreground font-mono">/{page.slug}</p>
-            {page.description && (
-              <p className="text-xs text-muted-foreground mt-0.5">{page.description}</p>
-            )}
-          </div>
-          <Button variant="ghost" size="icon" onClick={startEdit}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="border border-primary/30 rounded-lg bg-card px-4 py-4 space-y-3">
+    <div className="border border-border rounded-lg bg-card px-4 py-4 space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs">Name</Label>
@@ -191,13 +165,9 @@ function PageDetailsSection({
         <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} />
       </div>
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={saveEdit} disabled={saving || !editName.trim() || !editSlug.trim() || (editName.trim() === page.name && editSlug === page.slug && (editDesc.trim() || "") === (page.description ?? ""))}>
+        <Button size="sm" onClick={saveEdit} disabled={saving || !editName.trim() || !editSlug.trim() || !hasChanges}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
           Save
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-          <X className="h-3.5 w-3.5 mr-1" />
-          Cancel
         </Button>
       </div>
     </div>
