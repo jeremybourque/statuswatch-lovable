@@ -791,12 +791,10 @@ const AdminServices = () => {
               <Trash2 className="h-4 w-4 mr-1" />
               Delete Page
             </Button>
-            <Link to="/admin">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
           </div>
         </div>
       </header>
