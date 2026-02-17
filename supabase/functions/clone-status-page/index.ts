@@ -210,6 +210,11 @@ function mapIncidentImpact(impact: string): ServiceStatus {
 }
 
 async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<ExtractedIncident[]> {
+  const result = await fetchIncidentsFromAPIWithRaw(origin, progress);
+  return result.incidents;
+}
+
+async function fetchIncidentsFromAPIWithRaw(origin: string, progress: ProgressFn): Promise<{ incidents: ExtractedIncident[]; rawIncidents: any[] }> {
   // Fetch both unresolved and recent resolved incidents
   const [unresolvedRes, resolvedRes] = await Promise.all([
     fetch(`${origin}/api/v2/incidents/unresolved.json`, {
@@ -221,12 +226,14 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   ]);
 
   const allIncidents: ExtractedIncident[] = [];
+  const rawIncidents: any[] = [];
   const seenIds = new Set<string>();
 
   const parseIncidents = (data: any) => {
     for (const inc of (data?.incidents || [])) {
       if (seenIds.has(inc.id)) continue;
       seenIds.add(inc.id);
+      rawIncidents.push(inc);
       const updates: ExtractedIncidentUpdate[] = (inc.incident_updates || []).map((u: any) => ({
         status: mapIncidentStatus(u.status),
         message: u.body || "",
@@ -248,7 +255,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   // Sort newest first
   allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  return allIncidents;
+  return { incidents: allIncidents, rawIncidents };
 }
 
 // ── HTML fetching ──
