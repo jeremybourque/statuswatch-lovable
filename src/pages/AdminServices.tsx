@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useStatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, AlertTriangle } from "lucide-react";
+import { Activity, ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, AlertTriangle, ChevronDown } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -289,6 +289,210 @@ function EditableService({
   );
 }
 
+/* ─── Incident Update Row ─── */
+
+interface IncidentUpdateRow {
+  id: string;
+  status: string;
+  message: string;
+  created_at: string;
+}
+
+function EditableUpdate({
+  update,
+  onDelete,
+}: {
+  update: IncidentUpdateRow;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editStatus, setEditStatus] = useState(update.status);
+  const [editMessage, setEditMessage] = useState(update.message);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const saveEdit = async () => {
+    if (!editMessage.trim()) {
+      toast({ title: "Message is required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("incident_updates")
+      .update({ status: editStatus, message: editMessage.trim() })
+      .eq("id", update.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Update saved!" });
+    setEditing(false);
+    queryClient.invalidateQueries({ queryKey: ["admin-incident-updates"] });
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-start justify-between gap-2 py-2">
+        <div className="min-w-0">
+          <span className="text-xs font-semibold capitalize text-muted-foreground">{update.status}</span>
+          <span className="text-xs text-muted-foreground ml-1">— {new Date(update.created_at).toLocaleString()}</span>
+          <p className="text-sm text-card-foreground mt-0.5">{update.message}</p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditStatus(update.status); setEditMessage(update.message); setEditing(true); }}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(update.id)}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-primary/30 rounded-md bg-muted/30 px-3 py-3 space-y-2">
+      <div className="space-y-1">
+        <Label className="text-xs">Status</Label>
+        <Select value={editStatus} onValueChange={setEditStatus}>
+          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {INCIDENT_STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Message</Label>
+        <Textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} rows={2} />
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={saveEdit} disabled={saving || !editMessage.trim()}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+          Save
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          <X className="h-3.5 w-3.5 mr-1" />
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Incident Updates Panel ─── */
+
+function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
+  const { data: updates = [], isLoading } = useQuery({
+    queryKey: ["admin-incident-updates", incidentId],
+    queryFn: async (): Promise<IncidentUpdateRow[]> => {
+      const { data, error } = await supabase
+        .from("incident_updates")
+        .select("id, status, message, created_at")
+        .eq("incident_id", incidentId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [addStatus, setAddStatus] = useState("investigating");
+  const [addMessage, setAddMessage] = useState("");
+  const [creating, setCreating] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleAdd = async () => {
+    if (!addMessage.trim()) return;
+    setCreating(true);
+    const { error } = await supabase.from("incident_updates").insert({
+      incident_id: incidentId,
+      status: addStatus,
+      message: addMessage.trim(),
+    });
+    setCreating(false);
+    if (error) {
+      toast({ title: "Failed to add update", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Update added!" });
+    setAddMessage("");
+    setAddStatus("investigating");
+    setShowAdd(false);
+    queryClient.invalidateQueries({ queryKey: ["admin-incident-updates", incidentId] });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this update?")) return;
+    const { error } = await supabase.from("incident_updates").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["admin-incident-updates", incidentId] });
+  };
+
+  return (
+    <div className="mt-3 border-t border-border pt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Timeline Updates</p>
+        {!showAdd && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAdd(true)}>
+            <Plus className="h-3 w-3 mr-1" />
+            Add Update
+          </Button>
+        )}
+      </div>
+
+      {showAdd && (
+        <div className="border border-primary/30 rounded-md bg-muted/30 px-3 py-3 space-y-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Status</Label>
+            <Select value={addStatus} onValueChange={setAddStatus}>
+              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {INCIDENT_STATUS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Message</Label>
+            <Textarea placeholder="Describe the update..." value={addMessage} onChange={(e) => setAddMessage(e.target.value)} rows={2} autoFocus />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleAdd} disabled={creating || !addMessage.trim()}>
+              {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+              Add
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>
+              <X className="h-3.5 w-3.5 mr-1" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : updates.length === 0 && !showAdd ? (
+        <p className="text-xs text-muted-foreground">No updates yet.</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {updates.map((u) => (
+            <EditableUpdate key={u.id} update={u} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Editable Incident ─── */
 
 function EditableIncident({
@@ -299,6 +503,7 @@ function EditableIncident({
   onDelete: (id: string, title: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [editTitle, setEditTitle] = useState(incident.title);
   const [editStatus, setEditStatus] = useState(incident.status);
   const [editImpact, setEditImpact] = useState(incident.impact);
@@ -311,6 +516,7 @@ function EditableIncident({
     setEditStatus(incident.status);
     setEditImpact(incident.impact);
     setEditing(true);
+    setExpanded(true);
   };
 
   const saveEdit = async () => {
@@ -335,21 +541,29 @@ function EditableIncident({
 
   if (!editing) {
     return (
-      <div className="flex items-center justify-between border border-border rounded-lg bg-card px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-card-foreground">{incident.title}</p>
-          <p className="text-xs text-muted-foreground">
-            {incident.status} · {incident.impact} · {new Date(incident.created_at).toLocaleDateString()}
-          </p>
+      <div className="border border-border rounded-lg bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button onClick={() => setExpanded(!expanded)} className="text-left min-w-0 flex-1">
+            <p className="text-sm font-semibold text-card-foreground">{incident.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {incident.status} · {incident.impact} · {new Date(incident.created_at).toLocaleDateString()}
+            </p>
+          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="icon" onClick={startEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(incident.id, incident.title)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={startEdit}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(incident.id, incident.title)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        {expanded && (
+          <div className="px-4 pb-3">
+            <IncidentUpdatesPanel incidentId={incident.id} />
+          </div>
+        )}
       </div>
     );
   }
@@ -398,6 +612,7 @@ function EditableIncident({
           Delete
         </Button>
       </div>
+      <IncidentUpdatesPanel incidentId={incident.id} />
     </div>
   );
 }
