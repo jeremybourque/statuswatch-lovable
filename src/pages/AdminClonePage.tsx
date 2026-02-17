@@ -220,7 +220,7 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
         className="w-full px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between cursor-pointer"
       >
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {isComplete ? "Complete" : "Processing..."}
+          {isComplete ? "Completed" : "Processing..."}
         </span>
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
       </button>
