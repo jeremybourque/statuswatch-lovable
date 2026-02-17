@@ -191,7 +191,7 @@ function PageDetailsSection({
         <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} />
       </div>
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={saveEdit} disabled={saving || !editName.trim() || !editSlug.trim()}>
+        <Button size="sm" onClick={saveEdit} disabled={saving || !editName.trim() || !editSlug.trim() || (editName.trim() === page.name && editSlug === page.slug && (editDesc.trim() || "") === (page.description ?? ""))}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
           Save
         </Button>
