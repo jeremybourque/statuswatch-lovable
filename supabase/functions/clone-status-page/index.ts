@@ -93,7 +93,8 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       group: c.group_id ? (groupInfoMap.get(c.group_id)?.name || null) : null,
       uptime_pct: null,
       uptime_days: null,
-    }));
+      component_id: c.id,
+    } as ExtractedService & { component_id: string }));
 
     if (services.length === 0) {
       progress("No services found via API");
@@ -102,68 +103,80 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
     progress(`Found ${services.length} components via API`);
 
-    // Scrape the HTML page to extract uptime bar data from SVGs
-    let startDate: string | null = null;
-    try {
-      progress("Using Firecrawl to render page for uptime bar extraction...");
-      let rawHtml = await fetchRenderedHTMLForUptime(origin, progress);
-      console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
-
-      const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-      startDate = sinceMatch ? sinceMatch[1] : null;
-      progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
-
-      progress("Stripping non-essential markup, keeping SVG data...");
-      const uptimeHtml = rawHtml
-        .replace(/<script[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[\s\S]*?<\/style>/gi, "")
-        .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-        .replace(/<head[\s\S]*?<\/head>/gi, "")
-        .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-        .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/\s{2,}/g, " ")
-        .replace(/>\s+</g, "><");
-
-      console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
-
-      const serviceNames = services.map(s => s.name);
-      let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>;
-
-      if (startDate) {
-        progress("Date anchor found — using deterministic SVG rect parsing...");
-        uptimeMap = parseSvgDeterministic(uptimeHtml, serviceNames, progress);
-      } else {
-        const apiKey = Deno.env.get("LOVABLE_API_KEY");
-        if (!apiKey) throw new Error("AI not configured for uptime extraction");
-        uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
-      }
-
-      let matchedCount = 0;
-      for (const svc of services) {
-        const uptime = uptimeMap.get(svc.name);
-        if (uptime) {
-          svc.uptime_pct = uptime.uptime_pct ?? null;
-          svc.uptime_days = uptime.uptime_days ?? null;
-          if (Array.isArray(svc.uptime_days) && svc.uptime_days.length > 0) matchedCount++;
-        }
-      }
-
-      progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
-    } catch (e: any) {
-      progress(`Could not scrape uptime bars: ${e.message}`);
-      console.log("Could not scrape uptime bars:", e.message);
-    }
-
-    // Fetch incidents from API
+    // Fetch incidents from API (includes affected component IDs)
     let incidents: ExtractedIncident[] = [];
+    let allApiIncidents: any[] = [];
     try {
       progress("Fetching incidents from API...");
-      incidents = await fetchIncidentsFromAPI(origin, progress);
+      const fetchResult = await fetchIncidentsFromAPIWithRaw(origin, progress);
+      incidents = fetchResult.incidents;
+      allApiIncidents = fetchResult.rawIncidents;
       progress(`Found ${incidents.length} incidents via API`);
     } catch (e: any) {
       progress(`Could not fetch incidents: ${e.message}`);
     }
+
+    // Derive uptime from incident history — no HTML scraping needed
+    progress("Deriving uptime from incident history...");
+
+    // Build a map: component_id → set of dates with incidents
+    const componentIncidentDays = new Map<string, Set<string>>();
+    const today = new Date();
+
+    for (const inc of allApiIncidents) {
+      const affectedIds: string[] = [];
+      // Get component IDs from incident
+      if (inc.components) {
+        for (const comp of inc.components) {
+          if (comp.id) affectedIds.push(comp.id);
+        }
+      }
+
+      if (affectedIds.length === 0) continue;
+
+      // Determine the date range of the incident
+      const createdAt = new Date(inc.created_at);
+      const resolvedAt = inc.resolved_at ? new Date(inc.resolved_at) : today;
+
+      // Mark each affected day
+      const startDay = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate());
+      const endDay = new Date(resolvedAt.getFullYear(), resolvedAt.getMonth(), resolvedAt.getDate());
+
+      for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        for (const cid of affectedIds) {
+          if (!componentIncidentDays.has(cid)) componentIncidentDays.set(cid, new Set());
+          componentIncidentDays.get(cid)!.add(key);
+        }
+      }
+    }
+
+    // Build uptime arrays for each service using their component_id
+    const startDate = (() => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 89);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
+
+    for (const svc of services) {
+      const svcId = (svc as any).component_id;
+      const incidentDays = svcId ? componentIncidentDays.get(svcId) : undefined;
+      const days: (boolean | null)[] = [];
+
+      for (let i = 0; i < 90; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 89 + i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        days.push(incidentDays?.has(key) ? false : true);
+      }
+
+      const upDays = days.filter(d => d === true).length;
+      svc.uptime_days = days;
+      svc.uptime_pct = parseFloat(((upDays / 90) * 100).toFixed(4));
+    }
+
+    const matchedCount = services.filter(s => s.uptime_days && s.uptime_days.length > 0).length;
+    progress(`Derived uptime for ${matchedCount}/${services.length} services from incident history`);
 
     return { name: pageName, services, incidents, start_date: startDate };
   } catch (e) {
