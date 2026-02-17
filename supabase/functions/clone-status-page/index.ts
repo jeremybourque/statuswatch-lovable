@@ -272,7 +272,10 @@ function parseSvgDeterministic(
   // Find all component-inner-container or similar sections
   // Strategy: locate each service name, then find the nearest SVG after it and parse rects
   for (const name of serviceNames) {
-    const nameIdx = html.indexOf(name);
+    // Try both raw name and HTML-encoded version (& → &amp; etc.)
+    const htmlName = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let nameIdx = html.indexOf(name);
+    if (nameIdx === -1) nameIdx = html.indexOf(htmlName);
     if (nameIdx === -1) {
       console.log(`  Deterministic: service "${name}" not found in HTML`);
       continue;
