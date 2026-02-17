@@ -692,6 +692,7 @@ const AdminServices = () => {
   const [incidentImpact, setIncidentImpact] = useState("major");
   const [showAddIncident, setShowAddIncident] = useState(false);
   const [creatingIncident, setCreatingIncident] = useState(false);
+  const [incidentFilter, setIncidentFilter] = useState("");
 
   const handleAddService = async () => {
     if (!addingName.trim() || !page) return;
@@ -944,13 +945,25 @@ const AdminServices = () => {
                 </div>
               )}
 
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter incidents..."
+                  value={incidentFilter}
+                  onChange={(e) => setIncidentFilter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
               {incidents.length === 0 && !showAddIncident ? (
                 <p className="text-muted-foreground text-sm">No incidents yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {incidents.map((incident) => (
-                    <EditableIncident key={incident.id} incident={incident} onDelete={handleDeleteIncident} />
-                  ))}
+                  {incidents
+                    .filter((i) => i.title.toLowerCase().includes(incidentFilter.toLowerCase()))
+                    .map((incident) => (
+                      <EditableIncident key={incident.id} incident={incident} onDelete={handleDeleteIncident} />
+                    ))}
                 </div>
               )}
             </TabsContent>
