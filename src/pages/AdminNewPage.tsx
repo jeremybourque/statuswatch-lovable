@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect, useCallback } from "react";
 import { Activity, ArrowLeft, FileText, AlertTriangle, Network, PenLine } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 type Choice = "incident" | "clone" | "diagram" | "manual";
+
+const GAP = 16;
 
 const choices = [
   {
@@ -38,10 +40,39 @@ const AdminNewPage = () => {
   const backTo = from === "admin" ? "/admin" : "/";
 
   const [selected, setSelected] = useState<Choice | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [offsets, setOffsets] = useState<number[]>([]);
+
+  const measure = useCallback(() => {
+    const tops: number[] = [];
+    let cumulative = 0;
+    itemRefs.current.forEach((el, i) => {
+      tops.push(cumulative);
+      if (el) {
+        cumulative += el.getBoundingClientRect().height + GAP;
+      }
+    });
+    setOffsets(tops);
+  }, []);
+
+  useLayoutEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
 
   const handleBack = () => {
     setSelected(null);
   };
+
+  const selectedIndex = selected ? choices.findIndex((c) => c.id === selected) : -1;
+  const totalHeight = offsets.length > 0 && itemRefs.current[choices.length - 1]
+    ? offsets[choices.length - 1] + (itemRefs.current[choices.length - 1]?.getBoundingClientRect().height ?? 0)
+    : 0;
+  const selectedButtonHeight = selectedIndex >= 0
+    ? itemRefs.current[selectedIndex]?.getBoundingClientRect().height ?? 0
+    : 0;
+  const contentPullUp = selected ? totalHeight - selectedButtonHeight - GAP : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,19 +104,18 @@ const AdminNewPage = () => {
               const Icon = choice.icon;
               const isSelected = selected === choice.id;
               const isHidden = selected !== null && !isSelected;
-              // Each button is ~70px tall + 16px gap = 86px per slot
-              const slotHeight = 86;
-              const translateY = isSelected ? -(index * slotHeight) : 0;
+              const translateY = isSelected && offsets[index] ? -offsets[index] : 0;
 
               return (
                 <div
                   key={choice.id}
+                  ref={(el) => { itemRefs.current[index] = el; }}
                   className="transition-all duration-500 ease-in-out"
                   style={{
                     transform: `translateY(${translateY}px)`,
                     opacity: isHidden ? 0 : 1,
                     pointerEvents: isHidden ? "none" : "auto",
-                    marginBottom: 16,
+                    marginBottom: GAP,
                   }}
                 >
                   <Button
@@ -109,11 +139,8 @@ const AdminNewPage = () => {
             style={{
               maxHeight: selected ? 800 : 0,
               opacity: selected ? 1 : 0,
-              // Pull up to account for the now-invisible buttons below the selected one
-              transform: selected
-                ? `translateY(-${(choices.length - 1) * 86}px)`
-                : "translateY(0)",
-              marginTop: selected ? 16 : 0,
+              transform: `translateY(-${contentPullUp}px)`,
+              marginTop: selected ? GAP : 0,
             }}
           >
             <div className="border border-border rounded-lg p-8 bg-card">
