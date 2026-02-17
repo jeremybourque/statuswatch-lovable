@@ -7,55 +7,38 @@ import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { useRef, useState, useEffect, useCallback, type ReactNode } from "react";
+import { useRef, useState, useEffect, useMemo, type ReactNode } from "react";
 
-function MasonryGrid({ columnWidth, gap, children }: { columnWidth: number; gap: number; children: ReactNode }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [positions, setPositions] = useState<{ x: number; y: number }[]>([]);
-  const [containerHeight, setContainerHeight] = useState(0);
-
-  const layout = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const items = Array.from(container.children) as HTMLElement[];
-    if (items.length === 0) return;
-
-    const containerWidth = container.parentElement?.clientWidth ?? container.clientWidth;
-    const cols = Math.max(1, Math.floor((containerWidth + gap) / (columnWidth + gap)));
-    const actualColWidth = (containerWidth - gap * (cols - 1)) / cols;
-    const colHeights = new Array(cols).fill(0);
-    const newPositions: { x: number; y: number }[] = [];
-
-    items.forEach((item) => {
-      const shortest = colHeights.indexOf(Math.min(...colHeights));
-      const x = shortest * (actualColWidth + gap);
-      const y = colHeights[shortest];
-      newPositions.push({ x, y });
-      item.style.position = "absolute";
-      item.style.left = `${x}px`;
-      item.style.top = `${y}px`;
-      item.style.width = `${actualColWidth}px`;
-      colHeights[shortest] += item.offsetHeight + gap;
-    });
-
-    setPositions(newPositions);
-    setContainerHeight(Math.max(...colHeights) - gap);
-  }, [columnWidth, gap]);
-
+function useColumnCount(containerRef: React.RefObject<HTMLElement | null>, columnWidth: number, gap: number) {
+  const [cols, setCols] = useState(1);
   useEffect(() => {
-    layout();
-    const observer = new ResizeObserver(layout);
-    if (containerRef.current?.parentElement) {
-      observer.observe(containerRef.current.parentElement);
-    }
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      setCols(Math.max(1, Math.floor((w + gap) / (columnWidth + gap))));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
     return () => observer.disconnect();
-  }, [layout, children]);
+  }, [containerRef, columnWidth, gap]);
+  return cols;
+}
 
-  return (
-    <div ref={containerRef} className="relative" style={{ height: containerHeight || "auto" }}>
-      {children}
-    </div>
-  );
+/** Distribute items into `cols` buckets to minimize the max bucket weight (service count as proxy for height). */
+function balanceColumns<T>(items: T[], cols: number, weight: (item: T) => number): T[][] {
+  const buckets: T[][] = Array.from({ length: cols }, () => []);
+  const heights = new Array(cols).fill(0);
+
+  // Sort heaviest first for better greedy packing
+  const sorted = [...items].sort((a, b) => weight(b) - weight(a));
+  for (const item of sorted) {
+    const shortest = heights.indexOf(Math.min(...heights));
+    buckets[shortest].push(item);
+    heights[shortest] += weight(item);
+  }
+  return buckets;
 }
 
 function usePageServices(pageId: string) {
@@ -166,6 +149,46 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   );
 }
 
+function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug: string; description: string | null }[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cols = useColumnCount(containerRef, 240, 12);
+
+  // We need service counts to estimate card heights. Fetch them all via individual hooks won't work here,
+  // so we use a single query for all page service counts.
+  const { data: serviceCounts = {} } = useQuery({
+    queryKey: ["all-page-service-counts", pages.map((p) => p.id)],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("services")
+        .select("status_page_id")
+        .in("status_page_id", pages.map((p) => p.id));
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) {
+        counts[row.status_page_id] = (counts[row.status_page_id] || 0) + 1;
+      }
+      return counts;
+    },
+    enabled: pages.length > 0,
+  });
+
+  const columns = useMemo(() => {
+    return balanceColumns(pages, cols, (p) => (serviceCounts[p.id] ?? 0) + 3); // +3 for base card chrome
+  }, [pages, cols, serviceCounts]);
+
+  return (
+    <div ref={containerRef} className="flex gap-3">
+      {columns.map((col, ci) => (
+        <div key={ci} className="flex-1 min-w-0 flex flex-col gap-3">
+          {col.map((page) => (
+            <StatusPageCard key={page.id} page={page} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const StatusPagesIndex = () => {
   const { data: pages = [], isLoading } = useStatusPages();
 
@@ -193,11 +216,7 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <MasonryGrid columnWidth={240} gap={12}>
-            {pages.map((page) => (
-              <StatusPageCard key={page.id} page={page} />
-            ))}
-          </MasonryGrid>
+          <BalancedStatusGrid pages={pages} />
         )}
       </main>
 
