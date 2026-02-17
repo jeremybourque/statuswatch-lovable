@@ -342,8 +342,10 @@ async function fetchRenderedHTML(url: string): Promise<string> {
       onlyMainContent: false,
       waitFor: 5000,
       actions: [
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
+        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); }); document.querySelectorAll('.MuiAccordionSummary-root, .MuiButtonBase-root[aria-expanded=\"false\"], [class*=\"collapsed\"], [class*=\"Collapsed\"], [class*=\"expandable\"], [class*=\"Expandable\"]').forEach(el => el.click()); document.querySelectorAll('.MuiCollapse-hidden, .MuiCollapse-wrapper').forEach(el => { el.style.height = 'auto'; el.style.visibility = 'visible'; });" },
         { type: "wait", milliseconds: 3000 },
+        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click());" },
+        { type: "wait", milliseconds: 2000 },
       ],
     }),
   });
@@ -385,8 +387,10 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
       onlyMainContent: false,
       waitFor: 5000,
       actions: [
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });" },
+        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); }); document.querySelectorAll('.MuiAccordionSummary-root, .MuiButtonBase-root[aria-expanded=\"false\"], [class*=\"collapsed\"], [class*=\"Collapsed\"], [class*=\"expandable\"], [class*=\"Expandable\"]').forEach(el => el.click()); document.querySelectorAll('.MuiCollapse-hidden, .MuiCollapse-wrapper').forEach(el => { el.style.height = 'auto'; el.style.visibility = 'visible'; });" },
         { type: "wait", milliseconds: 3000 },
+        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click());" },
+        { type: "wait", milliseconds: 2000 },
       ],
     }),
   });
