@@ -2,6 +2,7 @@ import { useState, useRef, useLayoutEffect, useCallback } from "react";
 import { Activity, ArrowLeft, FileText, AlertTriangle, Network, PenLine } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ClonePageContent } from "@/pages/AdminClonePage";
 
 type Choice = "incident" | "clone" | "diagram" | "manual";
 
@@ -137,17 +138,20 @@ const AdminNewPage = () => {
           <div
             className="transition-all duration-500 ease-in-out overflow-hidden"
             style={{
-              maxHeight: selected ? 800 : 0,
+              maxHeight: selected ? "none" : 0,
               opacity: selected ? 1 : 0,
               transform: `translateY(-${contentPullUp}px)`,
               marginTop: selected ? GAP : 0,
             }}
           >
-            <div className="border border-border rounded-lg p-8 bg-card">
-              <p className="text-muted-foreground text-center">
-                This section is under construction. Coming soon!
-              </p>
-            </div>
+            {selected === "clone" && <ClonePageContent />}
+            {selected && selected !== "clone" && (
+              <div className="border border-border rounded-lg p-8 bg-card">
+                <p className="text-muted-foreground text-center">
+                  This section is under construction. Coming soon!
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>

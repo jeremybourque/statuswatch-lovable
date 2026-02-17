@@ -526,99 +526,374 @@ const AdminClonePage = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* URL input */}
-        <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Enter Status Page URL
-          </h2>
-          <div className="flex gap-3">
-            <Input
-              placeholder="https://status.example.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
-              className="flex-1"
-            />
-            <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
-              {fetching ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Globe className="h-4 w-4 mr-1" />}
-              {fetching ? "Analyzing..." : "Analyze"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Paste a public status page URL to extract its services and create a copy.
-          </p>
-
-          {logEntries.length > 0 && <ActivityLog entries={logEntries} />}
-        </section>
-
-        {/* Preview extracted data */}
-        {extracted && (
-          <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-card-foreground">Preview</h2>
-
-            {extracted.services?.length > 0 && (
-              <StatusBanner status={getGroupStatus(extracted.services)} />
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="clone-name">Name</Label>
-                <Input
-                  id="clone-name"
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clone-slug">Slug</Label>
-                <Input
-                  id="clone-slug"
-                  value={slug}
-                  onChange={(e) => {
-                    setSlugManual(true);
-                    setSlug(slugify(e.target.value));
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
-              </div>
-            </div>
-
-            {extracted.services?.length > 0 && (
-              <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
-            )}
-
-            {extracted.incidents?.length > 0 && (
-              <IncidentTimeline incidents={extracted.incidents.map((inc) => ({
-                id: inc.title,
-                title: inc.title,
-                status: inc.status,
-                impact: inc.impact,
-                createdAt: inc.created_at,
-                updates: inc.updates.map((u) => ({
-                  status: u.status as Incident["status"],
-                  message: u.message,
-                  timestamp: u.timestamp,
-                })),
-              }))} />
-            )}
-
-            <Button
-              onClick={handleCreate}
-              disabled={creating || !name.trim() || !slug.trim()}
-            >
-              {creating ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Plus className="h-4 w-4 mr-1" />
-              )}
-              Create Status Page
-            </Button>
-          </section>
-        )}
+        <ClonePageContent />
       </main>
     </div>
   );
 };
+
+export function ClonePageContent() {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [extracted, setExtracted] = useState<ExtractedData | null>(null);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugManual, setSlugManual] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+
+  const addLog = (message: string, status: LogEntry["status"] = "pending") => {
+    setLogEntries((prev) => [...prev, { message, status, timestamp: new Date() }]);
+  };
+
+  const completeLastLog = (status: "done" | "error" = "done") => {
+    setLogEntries((prev) => {
+      const updated = [...prev];
+      const lastPending = [...updated].reverse().findIndex((e) => e.status === "pending");
+      if (lastPending >= 0) {
+        updated[updated.length - 1 - lastPending] = { ...updated[updated.length - 1 - lastPending], status };
+      }
+      return updated;
+    });
+  };
+
+  const handleFetch = async () => {
+    if (!url.trim()) return;
+    setFetching(true);
+    setExtracted(null);
+    setLogEntries([]);
+
+    addLog("Starting analysis...");
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/clone-status-page`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Request failed (${response.status})`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let result: ExtractedData | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let newlineIdx: number;
+        while ((newlineIdx = buffer.indexOf("\n\n")) !== -1) {
+          const chunk = buffer.slice(0, newlineIdx).trim();
+          buffer = buffer.slice(newlineIdx + 2);
+
+          if (!chunk.startsWith("data: ")) continue;
+          const jsonStr = chunk.slice(6);
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "progress") {
+              completeLastLog("done");
+              addLog(event.message);
+            } else if (event.type === "result" && event.success) {
+              result = event.data as ExtractedData;
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message && !parseErr.message.includes("JSON")) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+
+      completeLastLog("done");
+
+      if (!result) throw new Error("No result received from analysis");
+
+      setExtracted(result);
+      setName(result.name || "");
+      if (!slugManual) {
+        const baseSlug = slugify(result.name || "");
+        const uniqueSlug = await findUniqueSlug(baseSlug);
+        setSlug(uniqueSlug);
+      }
+      const incidentCount = result.incidents?.length ?? 0;
+      toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services and ${incidentCount} incidents.` });
+    } catch (err: any) {
+      setLogEntries((prev) => prev.map((e) => (e.status === "pending" ? { ...e, status: "done" as const } : e)));
+      addLog(err.message || "Analysis failed", "error");
+      toast({ title: "Failed to analyze page", description: err.message, variant: "destructive" });
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  async function findUniqueSlug(base: string): Promise<string> {
+    let candidate = base;
+    let suffix = 1;
+    while (true) {
+      const { data } = await supabase
+        .from("status_pages")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!data) return candidate;
+      candidate = `${base}-${suffix}`;
+      suffix++;
+    }
+  }
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!slugManual) setSlug(slugify(val));
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim() || !slug.trim() || !extracted) return;
+    setCreating(true);
+
+    try {
+      const { data: page, error: pageErr } = await supabase
+        .from("status_pages")
+        .insert({ name: name.trim(), slug: slug.trim() })
+        .select("id")
+        .single();
+      if (pageErr) throw pageErr;
+
+      if (extracted.services?.length > 0) {
+        const groupNames = new Set<string>();
+        for (const s of extracted.services) {
+          if (s.group) groupNames.add(s.group);
+        }
+
+        const parentIdMap = new Map<string, string>();
+
+        if (groupNames.size > 0) {
+          let orderIdx = 0;
+          const parentRows = Array.from(groupNames).map((gName) => ({
+            name: gName,
+            status: "operational",
+            status_page_id: page.id,
+            display_order: orderIdx++,
+            uptime: 99.99,
+          }));
+          const groupNamesArr = Array.from(groupNames);
+          const { data: createdParents, error: pErr } = await supabase
+            .from("services")
+            .insert(parentRows)
+            .select("id");
+          if (pErr) throw pErr;
+          groupNamesArr.forEach((gName, i) => {
+            if (createdParents?.[i]) parentIdMap.set(gName, createdParents[i].id);
+          });
+        }
+
+        let childOrder = groupNames.size;
+        const childRows = extracted.services.map((s, i) => ({
+          name: s.name,
+          status: s.status,
+          parent_id: s.group ? (parentIdMap.get(s.group) ?? null) : null,
+          status_page_id: page.id,
+          display_order: childOrder + i,
+          uptime: s.uptime_pct ?? 100,
+        }));
+        const { data: createdServices, error: sErr } = await supabase
+          .from("services")
+          .insert(childRows)
+          .select("id");
+        if (sErr) throw sErr;
+
+        const uptimeRows: { service_id: string; day: string; up: boolean }[] = [];
+        extracted.services.forEach((s, i) => {
+          if (s.uptime_days && s.uptime_days.length > 0 && createdServices?.[i]) {
+            const serviceId = createdServices[i].id;
+            let anchorDate: Date;
+            if (extracted.start_date) {
+              const [y, m, d] = extracted.start_date.split("-").map(Number);
+              anchorDate = new Date(y, m - 1, d);
+            } else {
+              const now = new Date();
+              anchorDate = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+              anchorDate.setDate(anchorDate.getDate() - (s.uptime_days.length - 1));
+            }
+            s.uptime_days.forEach((up, dayIdx) => {
+              if (up === null) return;
+              const date = new Date(anchorDate);
+              date.setDate(date.getDate() + dayIdx);
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, "0");
+              const day = String(date.getDate()).padStart(2, "0");
+              uptimeRows.push({
+                service_id: serviceId,
+                day: `${year}-${month}-${day}`,
+                up,
+              });
+            });
+          }
+        });
+        if (uptimeRows.length > 0) {
+          const { error: uErr } = await supabase.from("uptime_days").insert(uptimeRows);
+          if (uErr) console.error("Failed to insert uptime days:", uErr);
+        }
+      }
+
+      if (extracted.incidents?.length > 0) {
+        for (const inc of extracted.incidents) {
+          const { data: createdInc, error: incErr } = await supabase
+            .from("incidents")
+            .insert({
+              status_page_id: page.id,
+              title: inc.title,
+              status: inc.status,
+              impact: inc.impact,
+              created_at: inc.created_at,
+            })
+            .select("id")
+            .single();
+          if (incErr) {
+            console.error("Failed to insert incident:", incErr);
+            continue;
+          }
+
+          if (inc.updates.length > 0) {
+            const updateRows = inc.updates.map((u) => ({
+              incident_id: createdInc.id,
+              status: u.status,
+              message: u.message,
+              created_at: u.timestamp,
+            }));
+            const { error: uErr } = await supabase.from("incident_updates").insert(updateRows);
+            if (uErr) console.error("Failed to insert incident updates:", uErr);
+          }
+        }
+      }
+
+      toast({ title: "Status page cloned!" });
+      navigate("/admin");
+    } catch (err: any) {
+      toast({
+        title: "Failed to create",
+        description: err.message.includes("duplicate")
+          ? "A page with that slug already exists."
+          : err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* URL input */}
+      <section className="border border-border rounded-xl bg-card p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+          <Globe className="h-5 w-5" />
+          Enter Status Page URL
+        </h2>
+        <div className="flex gap-3">
+          <Input
+            placeholder="https://status.example.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
+            className="flex-1"
+          />
+          <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
+            {fetching ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Globe className="h-4 w-4 mr-1" />}
+            {fetching ? "Analyzing..." : "Analyze"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Paste a public status page URL to extract its services and create a copy.
+        </p>
+
+        {logEntries.length > 0 && <ActivityLog entries={logEntries} />}
+      </section>
+
+      {/* Preview extracted data */}
+      {extracted && (
+        <section className="border border-border rounded-xl bg-card p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-card-foreground">Preview</h2>
+
+          {extracted.services?.length > 0 && (
+            <StatusBanner status={getGroupStatus(extracted.services)} />
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="clone-name">Name</Label>
+              <Input
+                id="clone-name"
+                value={name}
+                onChange={(e) => handleNameChange(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clone-slug">Slug</Label>
+              <Input
+                id="clone-slug"
+                value={slug}
+                onChange={(e) => {
+                  setSlugManual(true);
+                  setSlug(slugify(e.target.value));
+                }}
+              />
+              <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
+            </div>
+          </div>
+
+          {extracted.services?.length > 0 && (
+            <ExtractedServicesList services={extracted.services} startDate={extracted.start_date} />
+          )}
+
+          {extracted.incidents?.length > 0 && (
+            <IncidentTimeline incidents={extracted.incidents.map((inc) => ({
+              id: inc.title,
+              title: inc.title,
+              status: inc.status,
+              impact: inc.impact,
+              createdAt: inc.created_at,
+              updates: inc.updates.map((u) => ({
+                status: u.status as Incident["status"],
+                message: u.message,
+                timestamp: u.timestamp,
+              })),
+            }))} />
+          )}
+
+          <Button
+            onClick={handleCreate}
+            disabled={creating || !name.trim() || !slug.trim()}
+          >
+            {creating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Plus className="h-4 w-4 mr-1" />
+            )}
+            Create Status Page
+          </Button>
+        </section>
+      )}
+    </div>
+  );
+}
 
 export default AdminClonePage;
