@@ -45,10 +45,12 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
   return (
     <div className="flex items-center justify-between border border-border rounded-lg bg-card px-4 py-3">
       <div>
-        <Link to={`/${page.slug}`} className="text-sm font-semibold text-card-foreground hover:underline">
-          {page.name}
-        </Link>
-        <p className="text-xs text-muted-foreground font-mono">/{page.slug}</p>
+        <div className="flex items-center gap-2">
+          <Link to={`/${page.slug}`} className="text-sm font-semibold text-card-foreground hover:underline">
+            {page.name}
+          </Link>
+          <span className="text-xs text-muted-foreground font-mono">/{page.slug}</span>
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {serviceCount} service{serviceCount !== 1 ? "s" : ""} · {incidentCount} open incident{incidentCount !== 1 ? "s" : ""}
           {page.description && <> · {page.description}</>}
