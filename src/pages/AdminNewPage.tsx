@@ -35,15 +35,15 @@ const AdminNewPage = () => {
             variant="outline"
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
           >
-            <FileText className="h-8 w-8 text-primary" />
-            Clone my existing status page
+            <Network className="h-8 w-8 text-primary" />
+            Start with my system diagram
           </Button>
           <Button
             variant="outline"
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
           >
-            <Network className="h-8 w-8 text-primary" />
-            Start with my system diagram
+            <FileText className="h-8 w-8 text-primary" />
+            Clone my existing status page
           </Button>
           <Button
             variant="outline"
