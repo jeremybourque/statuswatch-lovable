@@ -153,50 +153,77 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
 
 function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug: string; description: string | null }[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
   const cols = useColumnCount(containerRef, 240, 12);
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number> | null>(null);
+  const [measurePass, setMeasurePass] = useState(0);
 
-  const { data: serviceCounts } = useQuery({
-    queryKey: ["all-page-service-counts", pages.map((p) => p.id)],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("status_page_id")
-        .in("status_page_id", pages.map((p) => p.id));
-      if (error) throw error;
-      const counts: Record<string, number> = {};
-      for (const row of data ?? []) {
-        counts[row.status_page_id] = (counts[row.status_page_id] || 0) + 1;
+  // Re-measure when pages or cols change
+  useEffect(() => {
+    setMeasuredHeights(null);
+    setMeasurePass((p) => p + 1);
+  }, [pages, cols]);
+
+  // After hidden measure cards render, read their heights
+  useEffect(() => {
+    if (measuredHeights) return;
+    const container = measureRef.current;
+    if (!container) return;
+
+    // Wait a frame for cards to render with data
+    const raf = requestAnimationFrame(() => {
+      const cards = container.querySelectorAll<HTMLElement>("[data-page-id]");
+      if (cards.length === 0) return;
+      const heights: Record<string, number> = {};
+      cards.forEach((card) => {
+        const id = card.getAttribute("data-page-id")!;
+        heights[id] = card.offsetHeight;
+      });
+      if (Object.keys(heights).length === pages.length) {
+        setMeasuredHeights(heights);
       }
-      return counts;
-    },
-    enabled: pages.length > 0,
-  });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [measurePass, measuredHeights, pages.length]);
 
   const columns = useMemo(() => {
-    if (!serviceCounts) {
-      // Before counts load, distribute round-robin to avoid all-in-one-column
+    if (!measuredHeights) {
+      // Before measurement, distribute round-robin
       const buckets: typeof pages[] = Array.from({ length: cols }, () => []);
       pages.forEach((p, i) => buckets[i % cols].push(p));
       return buckets;
     }
-    // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
-    const weight = (p: typeof pages[0]) => {
-      const count = serviceCounts[p.id] ?? 0;
-      return Math.ceil(count / 12) + 2;
-    };
+    const weight = (p: typeof pages[0]) => measuredHeights[p.id] ?? 100;
     return balanceColumns(pages, cols, weight);
-  }, [pages, cols, serviceCounts]);
+  }, [pages, cols, measuredHeights]);
 
   return (
-    <div ref={containerRef} className="flex gap-3">
-      {columns.map((col, ci) => (
-        <div key={ci} className="flex-1 min-w-0 flex flex-col gap-3">
-          {col.map((page) => (
-            <StatusPageCard key={page.id} page={page} />
+    <>
+      {/* Hidden measurement container — renders all cards in a single column to get natural heights */}
+      {!measuredHeights && (
+        <div
+          ref={measureRef}
+          aria-hidden
+          className="absolute opacity-0 pointer-events-none"
+          style={{ width: containerRef.current?.clientWidth ? `${Math.floor((containerRef.current.clientWidth - (cols - 1) * 12) / cols)}px` : "240px" }}
+        >
+          {pages.map((page) => (
+            <div key={page.id} data-page-id={page.id}>
+              <StatusPageCard page={page} />
+            </div>
           ))}
         </div>
-      ))}
-    </div>
+      )}
+      <div ref={containerRef} className="flex gap-3">
+        {columns.map((col, ci) => (
+          <div key={ci} className="flex-1 min-w-0 flex flex-col gap-3">
+            {col.map((page) => (
+              <StatusPageCard key={page.id} page={page} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
