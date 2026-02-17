@@ -7,6 +7,56 @@ import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { useRef, useState, useEffect, useCallback, type ReactNode } from "react";
+
+function MasonryGrid({ columnWidth, gap, children }: { columnWidth: number; gap: number; children: ReactNode }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [positions, setPositions] = useState<{ x: number; y: number }[]>([]);
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  const layout = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const items = Array.from(container.children) as HTMLElement[];
+    if (items.length === 0) return;
+
+    const containerWidth = container.parentElement?.clientWidth ?? container.clientWidth;
+    const cols = Math.max(1, Math.floor((containerWidth + gap) / (columnWidth + gap)));
+    const actualColWidth = (containerWidth - gap * (cols - 1)) / cols;
+    const colHeights = new Array(cols).fill(0);
+    const newPositions: { x: number; y: number }[] = [];
+
+    items.forEach((item) => {
+      const shortest = colHeights.indexOf(Math.min(...colHeights));
+      const x = shortest * (actualColWidth + gap);
+      const y = colHeights[shortest];
+      newPositions.push({ x, y });
+      item.style.position = "absolute";
+      item.style.left = `${x}px`;
+      item.style.top = `${y}px`;
+      item.style.width = `${actualColWidth}px`;
+      colHeights[shortest] += item.offsetHeight + gap;
+    });
+
+    setPositions(newPositions);
+    setContainerHeight(Math.max(...colHeights) - gap);
+  }, [columnWidth, gap]);
+
+  useEffect(() => {
+    layout();
+    const observer = new ResizeObserver(layout);
+    if (containerRef.current?.parentElement) {
+      observer.observe(containerRef.current.parentElement);
+    }
+    return () => observer.disconnect();
+  }, [layout, children]);
+
+  return (
+    <div ref={containerRef} className="relative" style={{ height: containerHeight || "auto" }}>
+      {children}
+    </div>
+  );
+}
 
 function usePageServices(pageId: string) {
   return useQuery({
@@ -81,7 +131,7 @@ function StatusPageCard({ page }: { page: { id: string; name: string; slug: stri
   return (
     <Link
       to={`/${page.slug}`}
-      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden break-inside-avoid mb-3"
+      className="group relative flex flex-col border border-border rounded-xl bg-card p-4 hover:border-primary/30 hover:shadow-lg transition-all duration-200 overflow-hidden"
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${config.bgClass}`} />
 
@@ -143,11 +193,11 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <div className="gap-3" style={{ columns: "240px" }}>
+          <MasonryGrid columnWidth={240} gap={12}>
             {pages.map((page) => (
               <StatusPageCard key={page.id} page={page} />
             ))}
-          </div>
+          </MasonryGrid>
         )}
       </main>
 
