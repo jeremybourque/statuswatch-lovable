@@ -143,7 +143,7 @@ const StatusPagesIndex = () => {
         ) : pages.length === 0 ? (
           <p className="text-muted-foreground text-sm">No status pages configured.</p>
         ) : (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+          <div className="gap-3" style={{ columns: "215px" }}>
             {pages.map((page) => (
               <StatusPageCard key={page.id} page={page} />
             ))}
