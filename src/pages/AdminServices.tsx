@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -405,6 +405,9 @@ function EditableIncident({
 /* ─── Main Page ─── */
 
 const AdminServices = () => {
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "details";
+
   const { slug } = useParams<{ slug: string }>();
   const { data: page, isLoading: pageLoading } = useStatusPage(slug ?? "");
   const { data: services = [], isLoading: servicesLoading } = useAdminServices(page?.id);
@@ -543,7 +546,7 @@ const AdminServices = () => {
         </div>
       ) : (
         <main className="max-w-4xl mx-auto px-4 py-8">
-          <Tabs defaultValue="details">
+          <Tabs defaultValue={defaultTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="details">Page Details</TabsTrigger>
               <TabsTrigger value="services">Services</TabsTrigger>
