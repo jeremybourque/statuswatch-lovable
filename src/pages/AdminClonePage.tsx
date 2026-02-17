@@ -409,8 +409,9 @@ const AdminClonePage = () => {
               const [y, m, d] = extracted.start_date.split("-").map(Number);
               anchorDate = new Date(y, m - 1, d);
             } else {
-              // Fallback: assume last bar is today
-              anchorDate = new Date();
+              // Fallback: last bar = today in UTC (source pages use UTC dates)
+              const now = new Date();
+              anchorDate = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
               anchorDate.setDate(anchorDate.getDate() - (s.uptime_days.length - 1));
             }
             s.uptime_days.forEach((up, dayIdx) => {
