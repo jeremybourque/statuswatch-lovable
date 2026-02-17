@@ -47,7 +47,7 @@ export function useServices(statusPageId: string | undefined) {
     queryFn: async (): Promise<Service[]> => {
       const { data: services, error: sErr } = await supabase
         .from("services")
-        .select("*")
+        .select("*, parent_id")
         .eq("status_page_id", statusPageId!)
         .order("display_order");
       if (sErr) throw sErr;
