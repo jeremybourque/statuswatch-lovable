@@ -421,6 +421,7 @@ function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
   const [showAdd, setShowAdd] = useState(false);
   const [addStatus, setAddStatus] = useState("investigating");
   const [addMessage, setAddMessage] = useState("");
+  const [addTimestamp, setAddTimestamp] = useState(toLocalDatetime(new Date().toISOString()));
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -432,6 +433,7 @@ function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
       incident_id: incidentId,
       status: addStatus,
       message: addMessage.trim(),
+      created_at: fromLocalDatetime(addTimestamp),
     });
     setCreating(false);
     if (error) {
@@ -441,6 +443,7 @@ function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
     toast({ title: "Update added!" });
     setAddMessage("");
     setAddStatus("investigating");
+    setAddTimestamp(toLocalDatetime(new Date().toISOString()));
     setShowAdd(false);
     queryClient.invalidateQueries({ queryKey: ["admin-incident-updates", incidentId] });
   };
@@ -469,6 +472,7 @@ function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
 
       {showAdd && (
         <div className="border border-primary/30 rounded-md bg-muted/30 px-3 py-3 space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div className="space-y-1">
             <Label className="text-xs">Status</Label>
             <Select value={addStatus} onValueChange={setAddStatus}>
@@ -480,6 +484,11 @@ function IncidentUpdatesPanel({ incidentId }: { incidentId: string }) {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Timestamp</Label>
+            <Input type="datetime-local" className="h-8" value={addTimestamp} onChange={(e) => setAddTimestamp(e.target.value)} />
+          </div>
+        </div>
           <div className="space-y-1">
             <Label className="text-xs">Message</Label>
             <Textarea placeholder="Describe the update..." value={addMessage} onChange={(e) => setAddMessage(e.target.value)} rows={2} autoFocus />
