@@ -18,15 +18,10 @@ function addLocalDays(date: Date, n: number): Date {
 }
 
 export function UptimeBar({ days, startDate }: UptimeBarProps) {
-  // Anchor dates to startDate if provided; otherwise use UTC today as the last bar
+  // If startDate provided, anchor dates to it; otherwise fall back to today-based
   const anchorDate = startDate
     ? parseLocalDate(startDate)
-    : (() => {
-        const now = new Date();
-        // Use UTC "today" since source pages use UTC dates
-        const utcToday = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-        return addLocalDays(utcToday, -(days.length - 1));
-      })();
+    : addLocalDays(new Date(), -(days.length - 1));
 
   return (
     <div className="flex gap-[2px] items-end">
