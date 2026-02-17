@@ -90,12 +90,7 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       console.log("Fetched HTML for uptime bars, length:", rawHtml.length);
 
       const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-      if (sinceMatch) {
-        // since-value is exclusive — first bar is the day AFTER
-        const [y, m, d] = sinceMatch[1].split("-").map(Number);
-        const anchor = new Date(y, m - 1, d + 1);
-        startDate = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
-      }
+      startDate = sinceMatch ? sinceMatch[1] : null;
       progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
 
       progress("Stripping non-essential markup, keeping SVG data...");
@@ -629,12 +624,7 @@ CRITICAL RULES:
   progress(`AI found ${totalChildren} services under ${totalParents} parent groups`);
 
   const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-  let startDate: string | null = null;
-  if (sinceMatch) {
-    const [y, m, d] = sinceMatch[1].split("-").map(Number);
-    const anchor = new Date(y, m - 1, d + 1);
-    startDate = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
-  }
+  const startDate = sinceMatch ? sinceMatch[1] : null;
   progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found");
 
   progress("Using Firecrawl for uptime bar HTML...");
@@ -644,12 +634,7 @@ CRITICAL RULES:
 
   // Try to find date anchor in the rendered HTML
   const sinceMatch2 = uptimeRawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-  let startDate2 = startDate;
-  if (sinceMatch2) {
-    const [y2, m2, d2] = sinceMatch2[1].split("-").map(Number);
-    const anchor2 = new Date(y2, m2 - 1, d2 + 1);
-    startDate2 = `${anchor2.getFullYear()}-${String(anchor2.getMonth() + 1).padStart(2, "0")}-${String(anchor2.getDate()).padStart(2, "0")}`;
-  }
+  const startDate2 = sinceMatch2 ? sinceMatch2[1] : startDate;
 
   const serviceNames = flatServices.map((s) => s.name);
 
