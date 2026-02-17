@@ -441,23 +441,48 @@ async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn)
   progress("Sending HTML to AI for service extraction...");
   const pass1 = await callAI(
     apiKey,
-    `You extract status page data from HTML. Return ONLY valid JSON with this structure:
+    `You extract status page data from HTML. The page has a HIERARCHICAL structure with parent services that contain child services.
+
+Return ONLY valid JSON with this structure:
 {
   "name": "Page name/title",
   "services": [
-    { "name": "Service Name", "status": "operational|degraded|partial|major|maintenance", "group": "Group Name or null" }
+    { "name": "Parent Service Name", "status": "operational|degraded|partial|major|maintenance", "group": null, "children": [
+      { "name": "Child Service Name", "status": "operational|degraded|partial|major|maintenance" }
+    ]},
+    { "name": "Standalone Service", "status": "operational", "group": null, "children": [] }
   ]
 }
-IMPORTANT: Extract ALL services listed on the page. Look for every component/service entry.
-If services are organized into groups/categories, include the group name. If no group, set "group" to null.
-CRITICAL: Group/category headers are NOT services. Do NOT include group names as separate service entries.
-Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational".
-For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.`,
-    "Extract the status page name and ALL services with their current statuses from this HTML:",
+
+CRITICAL RULES:
+1. Look for COLLAPSIBLE SECTIONS, ACCORDION PANELS, or NESTED LISTS. Parent services contain child services within them.
+2. If a service like "Integrations" contains sub-services like "JIRA", "Slack", "PagerDuty", then "Integrations" is a PARENT and those are its CHILDREN.
+3. Parent services should have a "children" array with their nested sub-services.
+4. Services with NO children should have an empty "children" array.
+5. Do NOT use the "group" field — use "children" for hierarchy instead. Set "group" to null for all services.
+6. Extract ALL services, including those inside collapsed/hidden sections.
+7. Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational".
+8. For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.`,
+    "Extract the status page name and ALL services (including nested/child services within parent categories) from this HTML:",
     servicesHtml
   );
 
-  progress(`AI found ${pass1.services?.length ?? 0} services`);
+  // Flatten hierarchical AI response into flat services with group field
+  const flatServices: { name: string; status: string; group: string | null }[] = [];
+  for (const s of (pass1.services || [])) {
+    if (s.children && s.children.length > 0) {
+      // This is a parent — don't add it as a service, use its name as group for children
+      for (const child of s.children) {
+        flatServices.push({ name: child.name, status: child.status, group: s.name });
+      }
+    } else {
+      flatServices.push({ name: s.name, status: s.status, group: s.group || null });
+    }
+  }
+
+  const totalChildren = flatServices.length;
+  const totalParents = (pass1.services || []).filter((s: any) => s.children?.length > 0).length;
+  progress(`AI found ${totalChildren} services under ${totalParents} parent groups`);
 
   const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
   const startDate = sinceMatch ? sinceMatch[1] : null;
@@ -472,15 +497,15 @@ For the "name" field, remove trailing suffixes like "| Status", "Status", "- Sta
   const sinceMatch2 = uptimeRawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
   const startDate2 = sinceMatch2 ? sinceMatch2[1] : startDate;
 
-  const serviceNames = (pass1.services || []).map((s: any) => s.name);
+  const serviceNames = flatServices.map((s) => s.name);
 
   const uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
 
-  const mergedServices: ExtractedService[] = (pass1.services || []).map((s: any) => {
+  const mergedServices: ExtractedService[] = flatServices.map((s) => {
     const uptime = uptimeMap.get(s.name);
     return {
       name: s.name,
-      status: s.status,
+      status: s.status as ServiceStatus,
       group: s.group,
       uptime_pct: uptime?.uptime_pct ?? null,
       uptime_days: uptime?.uptime_days ?? [],
