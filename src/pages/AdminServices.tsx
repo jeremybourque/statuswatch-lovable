@@ -594,7 +594,9 @@ function EditableIncident({
             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(incident.id, incident.title)}>
               <Trash2 className="h-4 w-4" />
             </Button>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+            <Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)}>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+            </Button>
           </div>
         </div>
         {expanded && (
