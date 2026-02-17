@@ -109,16 +109,7 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found, will use relative dates");
 
       progress("Stripping non-essential markup, keeping SVG data...");
-      const uptimeHtml = rawHtml
-        .replace(/<script[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[\s\S]*?<\/style>/gi, "")
-        .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-        .replace(/<head[\s\S]*?<\/head>/gi, "")
-        .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-        .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/\s{2,}/g, " ")
-        .replace(/>\s+</g, "><");
+      const uptimeHtml = stripForUptimeAggressive(rawHtml, services.map(s => s.name));
 
       console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
@@ -300,6 +291,52 @@ function stripForUptime(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s{2,}/g, " ")
     .replace(/>\s+</g, "><");
+}
+
+/**
+ * Aggressively strip HTML to only keep service name anchors and their SVG uptime bars.
+ * This reduces a 1.8MB page to ~50-200KB by extracting only the relevant fragments.
+ */
+function stripForUptimeAggressive(html: string, serviceNames: string[]): string {
+  // First do basic cleanup
+  let cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+
+  // For each service, extract a small window: the service name + the next SVG + uptime %
+  const fragments: string[] = [];
+  for (const name of serviceNames) {
+    const htmlName = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let nameIdx = cleaned.indexOf(name);
+    if (nameIdx === -1) nameIdx = cleaned.indexOf(htmlName);
+    if (nameIdx === -1) continue;
+
+    // Find the next <svg after this name
+    const svgStartIdx = cleaned.indexOf('<svg', nameIdx);
+    if (svgStartIdx === -1) continue;
+
+    const svgEndIdx = cleaned.indexOf('</svg>', svgStartIdx);
+    if (svgEndIdx === -1) continue;
+
+    // Grab from 100 chars before the name (for context) through end of SVG + 200 chars (for uptime %)
+    const fragStart = Math.max(0, nameIdx - 100);
+    const fragEnd = Math.min(cleaned.length, svgEndIdx + 6 + 200);
+    fragments.push(cleaned.slice(fragStart, fragEnd));
+  }
+
+  if (fragments.length === 0) {
+    // Fallback: return the old-style stripped version
+    return cleaned.replace(/\s{2,}/g, " ").replace(/>\s+</g, "><");
+  }
+
+  const result = fragments.join("\n\n<!-- NEXT SERVICE -->\n\n");
+  console.log(`Aggressive strip: ${serviceNames.length} services → ${fragments.length} fragments, ${result.length} chars (was ${html.length})`);
+  return result;
 }
 
 // ── Deterministic SVG rect parser ──
