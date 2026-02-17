@@ -71,14 +71,13 @@ export function useServices(statusPageId: string | undefined) {
       const flat = (services ?? []).map((s) => {
         const dayMap = uptimeMap.get(s.id);
         let days: (boolean | null)[] = [];
-        if (dayMap && dayMap.size > 0) {
-          const today = new Date();
-          for (let i = 89; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(d.getDate() - i);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-            days.push(dayMap.has(key) ? dayMap.get(key)! : null);
-          }
+        const today = new Date();
+        for (let i = 89; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          const dayMap = uptimeMap.get(s.id);
+          days.push(dayMap?.has(key) ? dayMap.get(key)! : null);
         }
         return {
           id: s.id,
