@@ -225,7 +225,7 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
       </button>
       {!collapsed && (
-        <ScrollArea className="max-h-48">
+        <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent">
           <div className="p-3 space-y-1.5">
             {entries.map((entry, i) => (
               <div key={i} className="flex items-start gap-2 text-sm">
@@ -239,7 +239,7 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
             ))}
             <div ref={bottomRef} />
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );
