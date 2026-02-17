@@ -26,30 +26,30 @@ const AdminNewPage = () => {
         <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto">
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium text-center whitespace-normal"
+            className="h-auto py-5 flex items-center gap-4 text-base font-medium justify-start px-6 whitespace-normal"
           >
-            <AlertTriangle className="h-8 w-8 text-destructive" />
+            <AlertTriangle className="h-10 w-10 shrink-0 text-destructive" />
             <span>Active incident—need a page <em>fast!</em></span>
           </Button>
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+            className="h-auto py-5 flex items-center gap-4 text-base font-medium justify-start px-6"
           >
-            <FileText className="h-8 w-8 text-primary" />
+            <FileText className="h-10 w-10 shrink-0 text-primary" />
             Clone my existing status page
           </Button>
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+            className="h-auto py-5 flex items-center gap-4 text-base font-medium justify-start px-6"
           >
-            <Network className="h-8 w-8 text-primary" />
+            <Network className="h-10 w-10 shrink-0 text-primary" />
             Start with my system diagram
           </Button>
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+            className="h-auto py-5 flex items-center gap-4 text-base font-medium justify-start px-6"
           >
-            <PenLine className="h-8 w-8 text-muted-foreground" />
+            <PenLine className="h-10 w-10 shrink-0 text-muted-foreground" />
             Do it the old fashioned way
           </Button>
         </div>
