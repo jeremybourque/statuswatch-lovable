@@ -675,9 +675,61 @@ CRITICAL RULES:
 5. If you cannot determine exact timestamps, use reasonable ISO 8601 dates based on relative text like "2 days ago".
 6. Return an empty incidents array if no incidents are found.`;
 
+function findIncidentHistoryUrl(html: string, baseUrl: string): string | null {
+  // Look for links to incident history pages
+  const patterns = [
+    /href="([^"]*(?:incident[s\-_]*histor|histor[y\-_]*incident|past[_\-]*incident|incident[s]?\/?\?|\/history)[^"]*)"/gi,
+    /href="([^"]*\/incidents?\/?[^"]*)"/gi,
+  ];
+
+  const origin = new URL(baseUrl).origin;
+  const seen = new Set<string>();
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      let href = match[1].trim();
+      // Skip anchors, javascript, and the current page
+      if (href.startsWith('#') || href.startsWith('javascript:') || href === '/') continue;
+      // Resolve relative URLs
+      if (href.startsWith('/')) href = origin + href;
+      else if (!href.startsWith('http')) href = origin + '/' + href;
+      // Skip if it's the same as the base URL
+      try {
+        const parsed = new URL(href);
+        const base = new URL(baseUrl);
+        if (parsed.pathname === base.pathname || parsed.pathname === '/') continue;
+        if (seen.has(parsed.href)) continue;
+        seen.add(parsed.href);
+        // Prefer URLs with "history" or "incidents" in them
+        if (/histor|incident/i.test(parsed.pathname)) {
+          return parsed.href;
+        }
+      } catch { continue; }
+    }
+  }
+
+  return null;
+}
+
+function parseIncidentsFromAIResult(result: any): ExtractedIncident[] {
+  return (result.incidents || []).map((inc: any) => ({
+    title: inc.title || "Untitled Incident",
+    status: inc.status || "resolved",
+    impact: inc.impact || "major",
+    created_at: inc.created_at || new Date().toISOString(),
+    updates: (inc.updates || []).map((u: any) => ({
+      status: u.status || "investigating",
+      message: u.message || "",
+      timestamp: u.timestamp || inc.created_at || new Date().toISOString(),
+    })),
+  }));
+}
+
 async function extractIncidentsViaAI(
   apiKey: string,
   html: string,
+  baseUrl: string,
   progress: ProgressFn,
 ): Promise<ExtractedIncident[]> {
   progress("Sending HTML to AI for incident extraction...");
@@ -689,17 +741,51 @@ async function extractIncidentsViaAI(
     html
   );
 
-  const incidents: ExtractedIncident[] = (result.incidents || []).map((inc: any) => ({
-    title: inc.title || "Untitled Incident",
-    status: inc.status || "resolved",
-    impact: inc.impact || "major",
-    created_at: inc.created_at || new Date().toISOString(),
-    updates: (inc.updates || []).map((u: any) => ({
-      status: u.status || "investigating",
-      message: u.message || "",
-      timestamp: u.timestamp || inc.created_at || new Date().toISOString(),
-    })),
-  }));
+  let incidents = parseIncidentsFromAIResult(result);
+  progress(`Found ${incidents.length} incidents on main page`);
+
+  // Check for incident history link
+  const historyUrl = findIncidentHistoryUrl(html, baseUrl);
+  if (historyUrl) {
+    progress(`Found incident history link: ${historyUrl}`);
+    try {
+      let historyHtml: string;
+      try {
+        const res = await fetchWithRetries(historyUrl);
+        historyHtml = await res.text();
+      } catch {
+        historyHtml = await fetchRenderedHTML(historyUrl);
+      }
+
+      const strippedHistory = stripForServices(historyHtml);
+      if (strippedHistory.length > 200) {
+        progress("Extracting incidents from history page...");
+        const historyResult = await callAI(
+          apiKey,
+          INCIDENT_SYSTEM_PROMPT,
+          "Extract all incidents (current and historical) from this incident history page HTML:",
+          strippedHistory
+        );
+        const historyIncidents = parseIncidentsFromAIResult(historyResult);
+        progress(`Found ${historyIncidents.length} incidents on history page`);
+
+        // Merge, dedup by title + created_at
+        const seen = new Set(incidents.map(i => `${i.title}::${i.created_at}`));
+        for (const inc of historyIncidents) {
+          const key = `${inc.title}::${inc.created_at}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            incidents.push(inc);
+          }
+        }
+        // Re-sort newest first
+        incidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        progress(`Total unique incidents after merge: ${incidents.length}`);
+      }
+    } catch (e: any) {
+      progress(`Could not fetch incident history page: ${e.message}`);
+    }
+  }
 
   return incidents;
 }
@@ -824,7 +910,7 @@ CRITICAL RULES:
   let incidents: ExtractedIncident[] = [];
   try {
     progress("Extracting incidents from page...");
-    incidents = await extractIncidentsViaAI(apiKey, servicesHtml, progress);
+    incidents = await extractIncidentsViaAI(apiKey, servicesHtml, url, progress);
     progress(`Found ${incidents.length} incidents`);
   } catch (e: any) {
     progress(`Could not extract incidents: ${e.message}`);
