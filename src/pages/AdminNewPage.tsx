@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, FileText, AlertTriangle } from "lucide-react";
+import { Activity, ArrowLeft, FileText, AlertTriangle, Network } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +23,7 @@ const AdminNewPage = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <Button
             variant="outline"
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
@@ -37,6 +37,13 @@ const AdminNewPage = () => {
           >
             <AlertTriangle className="h-8 w-8 text-destructive" />
             <span>Need a status page for my active incident—<em>fast!</em></span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+          >
+            <Network className="h-8 w-8 text-primary" />
+            Start with my system diagram
           </Button>
         </div>
       </main>
