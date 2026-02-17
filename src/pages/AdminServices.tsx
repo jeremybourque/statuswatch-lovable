@@ -239,22 +239,27 @@ function EditableService({
 
   if (!editing) {
     return (
-      <div className="flex items-center justify-between border border-border rounded-lg bg-card px-4 py-3">
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${config.dotClass}`} />
-          <div>
-            <p className="text-sm font-semibold text-card-foreground">{service.name}</p>
-            <p className={`text-xs font-medium ${config.colorClass}`}>{config.label}</p>
+      <div className="bg-card hover:bg-accent/50 transition-colors">
+        <div className="w-full flex items-center justify-between p-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="relative flex h-3 w-3">
+              {service.status !== "operational" && (
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
+              )}
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotClass}`} />
+            </span>
+            <span className="font-medium text-card-foreground truncate">{service.name}</span>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground font-mono mr-2">{service.uptime}%</span>
-          <Button variant="ghost" size="icon" onClick={startEdit}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(service.id, service.name)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${config.colorClass}`}>{config.label}</span>
+            <span className="text-xs text-muted-foreground font-mono w-14 text-right">{service.uptime}%</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={startEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(service.id, service.name)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -877,11 +882,16 @@ const AdminServices = () => {
               {services.length === 0 && !showAddService ? (
                 <p className="text-muted-foreground text-sm">No services yet. Add one to get started.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-0 border border-border rounded-lg overflow-hidden">
                   {services
                     .filter((s) => s.name.toLowerCase().includes(serviceFilter.toLowerCase()))
-                    .map((service) => (
-                      <EditableService key={service.id} service={service} onDelete={handleDeleteService} />
+                    .map((service, index, filtered) => (
+                      <div
+                        key={service.id}
+                        className={index !== filtered.length - 1 ? "border-b border-border" : ""}
+                      >
+                        <EditableService service={service} onDelete={handleDeleteService} />
+                      </div>
                     ))}
                 </div>
               )}
