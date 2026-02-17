@@ -26,14 +26,14 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
         )}
       </div>
       <div className="flex items-center gap-1">
+        <Link to={`/admin/${page.slug}/services?tab=details`}>
+          <Button variant="ghost" size="icon" title="Edit page details">
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </Link>
         <Link to={`/admin/${page.slug}/services?tab=services`}>
           <Button variant="ghost" size="icon" title="Manage services">
             <Server className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Link to={`/admin/${page.slug}/services?tab=details`}>
-          <Button variant="ghost" size="icon" title="Edit page">
-            <Pencil className="h-4 w-4" />
           </Button>
         </Link>
         <Button
