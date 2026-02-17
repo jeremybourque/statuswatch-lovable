@@ -4,7 +4,34 @@ import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Server, Globe, Aler
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+function usePageCounts(pageId: string) {
+  const { data: serviceCount = 0 } = useQuery({
+    queryKey: ["service-count", pageId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("services")
+        .select("*", { count: "exact", head: true })
+        .eq("status_page_id", pageId);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  const { data: incidentCount = 0 } = useQuery({
+    queryKey: ["open-incident-count", pageId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("incidents")
+        .select("*", { count: "exact", head: true })
+        .eq("status_page_id", pageId)
+        .neq("status", "resolved");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  return { serviceCount, incidentCount };
+}
 
 function slugify(text: string) {
   return text
@@ -14,6 +41,7 @@ function slugify(text: string) {
 }
 
 function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, name: string) => void }) {
+  const { serviceCount, incidentCount } = usePageCounts(page.id);
   return (
     <div className="flex items-center justify-between border border-border rounded-lg bg-card px-4 py-3">
       <div>
@@ -21,9 +49,10 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
           {page.name}
         </Link>
         <p className="text-xs text-muted-foreground font-mono">/{page.slug}</p>
-        {page.description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{page.description}</p>
-        )}
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {serviceCount} service{serviceCount !== 1 ? "s" : ""} · {incidentCount} open incident{incidentCount !== 1 ? "s" : ""}
+          {page.description && <> · {page.description}</>}
+        </p>
       </div>
       <div className="flex items-center gap-1">
         <Link to={`/admin/${page.slug}/services?tab=details`}>
