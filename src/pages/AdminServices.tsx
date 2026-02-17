@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useStatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, AlertTriangle, ChevronDown } from "lucide-react";
+import { Activity, ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -684,6 +684,7 @@ const AdminServices = () => {
   const [addingStatus, setAddingStatus] = useState<string>("operational");
   const [showAddService, setShowAddService] = useState(false);
   const [creatingService, setCreatingService] = useState(false);
+  const [serviceFilter, setServiceFilter] = useState("");
 
   // Incident add form
   const [incidentTitle, setIncidentTitle] = useState("");
@@ -863,13 +864,25 @@ const AdminServices = () => {
                 </div>
               )}
 
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter services..."
+                  value={serviceFilter}
+                  onChange={(e) => setServiceFilter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
               {services.length === 0 && !showAddService ? (
                 <p className="text-muted-foreground text-sm">No services yet. Add one to get started.</p>
               ) : (
                 <div className="space-y-2">
-                  {services.map((service) => (
-                    <EditableService key={service.id} service={service} onDelete={handleDeleteService} />
-                  ))}
+                  {services
+                    .filter((s) => s.name.toLowerCase().includes(serviceFilter.toLowerCase()))
+                    .map((service) => (
+                      <EditableService key={service.id} service={service} onDelete={handleDeleteService} />
+                    ))}
                 </div>
               )}
             </TabsContent>
