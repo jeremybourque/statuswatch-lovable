@@ -26,17 +26,17 @@ const AdminNewPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto">
           <Button
             variant="outline"
-            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
-          >
-            <FileText className="h-8 w-8 text-primary" />
-            Clone my existing status page
-          </Button>
-          <Button
-            variant="outline"
             className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium text-center whitespace-normal"
           >
             <AlertTriangle className="h-8 w-8 text-destructive" />
             <span>Active incident—need a page <em>fast!</em></span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-8 flex flex-col items-center gap-3 text-base font-medium"
+          >
+            <FileText className="h-8 w-8 text-primary" />
+            Clone my existing status page
           </Button>
           <Button
             variant="outline"
