@@ -32,7 +32,7 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
           </Button>
         </Link>
         <Link to={`/admin/${page.slug}/services?tab=services`}>
-          <Button variant="ghost" size="icon" title="Manage services">
+          <Button variant="ghost" size="icon" title="Edit services">
             <Server className="h-4 w-4" />
           </Button>
         </Link>
