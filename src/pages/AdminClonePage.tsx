@@ -476,6 +476,7 @@ const AdminClonePage = () => {
               placeholder="https://status.example.com"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && url.trim() && !fetching) handleFetch(); }}
               className="flex-1"
             />
             <Button onClick={handleFetch} disabled={fetching || !url.trim()}>
