@@ -74,11 +74,13 @@ function ExtractedServiceItem({ service }: { service: ExtractedService }) {
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 ml-6">
             <div className="flex-1 min-w-0">
-              <UptimeBar days={
-                service.uptime_days && service.uptime_days.length > 0
+              <UptimeBar days={(() => {
+                const days = service.uptime_days && service.uptime_days.length > 0
                   ? service.uptime_days
-                  : Array(90).fill(null)
-              } />
+                  : [];
+                if (days.length >= 90) return days.slice(-90);
+                return [...Array(90 - days.length).fill(null), ...days];
+              })()} />
             </div>
             {service.uptime_pct != null && (
               <span className="font-mono text-sm text-muted-foreground shrink-0">
