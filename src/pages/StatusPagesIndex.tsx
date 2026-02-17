@@ -174,9 +174,9 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
 
   const columns = useMemo(() => {
     if (!serviceCounts) {
-      // Before counts load, distribute round-robin to avoid all-in-one-column
+      // Before counts load, distribute round-robin right-to-left
       const buckets: typeof pages[] = Array.from({ length: cols }, () => []);
-      pages.forEach((p, i) => buckets[i % cols].push(p));
+      pages.forEach((p, i) => buckets[cols - 1 - (i % cols)].push(p));
       return buckets;
     }
     // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
