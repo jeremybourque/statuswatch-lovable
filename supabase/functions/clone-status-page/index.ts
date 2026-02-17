@@ -770,11 +770,10 @@ async function extractIncidentsViaAI(
         progress(`Found ${historyIncidents.length} incidents on history page`);
 
         // Merge, dedup by title + created_at
-        const seen = new Set(incidents.map(i => `${i.title}::${i.created_at}`));
+        const seen = new Set(incidents.map(i => i.title));
         for (const inc of historyIncidents) {
-          const key = `${inc.title}::${inc.created_at}`;
-          if (!seen.has(key)) {
-            seen.add(key);
+          if (!seen.has(inc.title)) {
+            seen.add(inc.title);
             incidents.push(inc);
           }
         }
