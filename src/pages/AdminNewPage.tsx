@@ -67,44 +67,40 @@ const AdminNewPage = () => {
 
       <main className={`max-w-4xl mx-auto px-4 transition-all duration-500 ease-in-out ${selected ? "pt-6" : "py-16"}`}>
         <div className="max-w-2xl mx-auto">
-          {/* Button list - reorder so selected is always first */}
-          <div className="flex flex-col gap-4">
-            {(() => {
-              const ordered = selected
-                ? [choices.find((c) => c.id === selected)!, ...choices.filter((c) => c.id !== selected)]
-                : choices;
+          {/* Button list */}
+          <div className="relative">
+            {choices.map((choice, index) => {
+              const Icon = choice.icon;
+              const isSelected = selected === choice.id;
+              const isHidden = selected !== null && !isSelected;
+              // Each button is ~70px tall + 16px gap = 86px per slot
+              const slotHeight = 86;
+              const translateY = isSelected ? -(index * slotHeight) : 0;
 
-              return ordered.map((choice) => {
-                const Icon = choice.icon;
-                const isSelected = selected === choice.id;
-                const isHidden = selected !== null && !isSelected;
-
-                return (
-                  <div
-                    key={choice.id}
-                    className="transition-all duration-500 ease-in-out"
-                    style={{
-                      maxHeight: isHidden ? 0 : 100,
-                      opacity: isHidden ? 0 : 1,
-                      padding: isHidden ? 0 : undefined,
-                      overflow: "hidden",
-                    }}
+              return (
+                <div
+                  key={choice.id}
+                  className="transition-all duration-500 ease-in-out"
+                  style={{
+                    transform: `translateY(${translateY}px)`,
+                    opacity: isHidden ? 0 : 1,
+                    pointerEvents: isHidden ? "none" : "auto",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Button
+                    variant="outline"
+                    className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-colors duration-300 ${
+                      isSelected ? "border-primary bg-accent" : ""
+                    }`}
+                    onClick={() => !selected && setSelected(choice.id)}
                   >
-                    <Button
-                      variant="outline"
-                      className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-all duration-300 ${
-                        isSelected ? "border-primary bg-accent" : ""
-                      }`}
-                      onClick={() => !selected && setSelected(choice.id)}
-                      disabled={!!selected && !isSelected}
-                    >
-                      <Icon className={`h-10 w-10 shrink-0 ${choice.iconClass}`} />
-                      {choice.label}
-                    </Button>
-                  </div>
-                );
-              });
-            })()}
+                    <Icon className={`h-10 w-10 shrink-0 ${choice.iconClass}`} />
+                    {choice.label}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Expanded section */}
@@ -113,7 +109,11 @@ const AdminNewPage = () => {
             style={{
               maxHeight: selected ? 800 : 0,
               opacity: selected ? 1 : 0,
-              marginTop: selected ? 32 : 0,
+              // Pull up to account for the now-invisible buttons below the selected one
+              transform: selected
+                ? `translateY(-${(choices.length - 1) * 86}px)`
+                : "translateY(0)",
+              marginTop: selected ? 16 : 0,
             }}
           >
             <div className="border border-border rounded-lg p-8 bg-card">
