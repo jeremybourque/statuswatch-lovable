@@ -153,9 +153,7 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
   const containerRef = useRef<HTMLDivElement>(null);
   const cols = useColumnCount(containerRef, 240, 12);
 
-  // We need service counts to estimate card heights. Fetch them all via individual hooks won't work here,
-  // so we use a single query for all page service counts.
-  const { data: serviceCounts = {} } = useQuery({
+  const { data: serviceCounts } = useQuery({
     queryKey: ["all-page-service-counts", pages.map((p) => p.id)],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -173,7 +171,18 @@ function BalancedStatusGrid({ pages }: { pages: { id: string; name: string; slug
   });
 
   const columns = useMemo(() => {
-    return balanceColumns(pages, cols, (p) => (serviceCounts[p.id] ?? 0) + 3); // +3 for base card chrome
+    if (!serviceCounts) {
+      // Before counts load, distribute round-robin to avoid all-in-one-column
+      const buckets: typeof pages[] = Array.from({ length: cols }, () => []);
+      pages.forEach((p, i) => buckets[i % cols].push(p));
+      return buckets;
+    }
+    // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
+    const weight = (p: typeof pages[0]) => {
+      const count = serviceCounts[p.id] ?? 0;
+      return Math.ceil(count / 12) + 2;
+    };
+    return balanceColumns(pages, cols, weight);
   }, [pages, cols, serviceCounts]);
 
   return (
