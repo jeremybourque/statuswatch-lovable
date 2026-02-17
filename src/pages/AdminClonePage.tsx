@@ -349,19 +349,50 @@ const AdminClonePage = () => {
         .single();
       if (pageErr) throw pageErr;
 
-      // Create services
+      // Create services with parent-child hierarchy
       if (extracted.services?.length > 0) {
-        const services = extracted.services.map((s, i) => ({
+        // First pass: create parent services (those with children grouped under them)
+        const groupNames = new Set<string>();
+        for (const s of extracted.services) {
+          if (s.group) groupNames.add(s.group);
+        }
+
+        const parentIdMap = new Map<string, string>(); // group name -> parent service id
+
+        if (groupNames.size > 0) {
+          let orderIdx = 0;
+          const parentRows = Array.from(groupNames).map((gName) => ({
+            name: gName,
+            status: "operational",
+            status_page_id: page.id,
+            display_order: orderIdx++,
+            uptime: 99.99,
+          }));
+          // We need to preserve insertion order to map back
+          const groupNamesArr = Array.from(groupNames);
+          const { data: createdParents, error: pErr } = await supabase
+            .from("services")
+            .insert(parentRows)
+            .select("id");
+          if (pErr) throw pErr;
+          groupNamesArr.forEach((gName, i) => {
+            if (createdParents?.[i]) parentIdMap.set(gName, createdParents[i].id);
+          });
+        }
+
+        // Second pass: create child/standalone services
+        let childOrder = groupNames.size;
+        const childRows = extracted.services.map((s, i) => ({
           name: s.name,
           status: s.status,
-          group_name: s.group || null,
+          parent_id: s.group ? (parentIdMap.get(s.group) ?? null) : null,
           status_page_id: page.id,
-          display_order: i,
+          display_order: childOrder + i,
           uptime: s.uptime_pct ?? 100,
         }));
         const { data: createdServices, error: sErr } = await supabase
           .from("services")
-          .insert(services)
+          .insert(childRows)
           .select("id");
         if (sErr) throw sErr;
 

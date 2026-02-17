@@ -51,9 +51,10 @@ function ServiceCard({ service }: { service: Service }) {
   );
 }
 
-function ServiceGroup({ groupName, services }: { groupName: string; services: Service[] }) {
+function ServiceGroup({ parent }: { parent: Service }) {
   const [collapsed, setCollapsed] = useState(false);
-  const groupStatus = getOverallStatus(services);
+  const children = parent.children ?? [];
+  const groupStatus = children.length > 0 ? getOverallStatus(children) : parent.status;
 
   return (
     <div>
@@ -64,7 +65,7 @@ function ServiceGroup({ groupName, services }: { groupName: string; services: Se
         <div className="flex items-center gap-2">
           <StatusDot status={groupStatus} />
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {groupName}
+            {parent.name}
           </h3>
         </div>
         <div className="flex items-center gap-2">
@@ -78,10 +79,10 @@ function ServiceGroup({ groupName, services }: { groupName: string; services: Se
       </button>
       {!collapsed && (
         <div className="space-y-0 border border-border rounded-lg overflow-hidden">
-          {services.map((service, index) => (
+          {children.map((service, index) => (
             <div
               key={service.id}
-              className={index !== services.length - 1 ? "border-b border-border" : ""}
+              className={index !== children.length - 1 ? "border-b border-border" : ""}
             >
               <ServiceCard service={service} />
             </div>
@@ -93,47 +94,15 @@ function ServiceGroup({ groupName, services }: { groupName: string; services: Se
 }
 
 export function ServiceList({ services }: { services: Service[] }) {
-  type Section = { type: "group"; name: string; services: Service[] } | { type: "ungrouped"; services: Service[] };
-  const sections: Section[] = [];
-  const groupMap = new Map<string, Service[]>();
-  let currentUngrouped: Service[] | null = null;
-
-  for (const s of services) {
-    if (s.group_name) {
-      currentUngrouped = null;
-      if (!groupMap.has(s.group_name)) {
-        const arr: Service[] = [];
-        groupMap.set(s.group_name, arr);
-        sections.push({ type: "group", name: s.group_name, services: arr });
-      }
-      groupMap.get(s.group_name)!.push(s);
-    } else {
-      if (!currentUngrouped) {
-        currentUngrouped = [];
-        sections.push({ type: "ungrouped", services: currentUngrouped });
-      }
-      currentUngrouped.push(s);
-    }
-  }
-
-  const hasGroups = groupMap.size > 0;
-
   return (
     <div className="space-y-6">
-      {sections.map((section, i) => {
-        if (section.type === "group") {
-          return <ServiceGroup key={`group-${section.name}`} groupName={section.name} services={section.services} />;
+      {services.map((service) => {
+        if (service.children && service.children.length > 0) {
+          return <ServiceGroup key={service.id} parent={service} />;
         }
         return (
-          <div key={`ungrouped-${i}`} className="space-y-0 border border-border rounded-lg overflow-hidden">
-            {section.services.map((service, index) => (
-              <div
-                key={service.id}
-                className={index !== section.services.length - 1 ? "border-b border-border" : ""}
-              >
-                <ServiceCard service={service} />
-              </div>
-            ))}
+          <div key={service.id} className="space-y-0 border border-border rounded-lg overflow-hidden">
+            <ServiceCard service={service} />
           </div>
         );
       })}

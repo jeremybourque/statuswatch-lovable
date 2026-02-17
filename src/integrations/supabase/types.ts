@@ -112,6 +112,7 @@ export type Database = {
           group_name: string | null
           id: string
           name: string
+          parent_id: string | null
           status: string
           status_page_id: string
           updated_at: string
@@ -123,6 +124,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           status?: string
           status_page_id: string
           updated_at?: string
@@ -134,12 +136,20 @@ export type Database = {
           group_name?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           status?: string
           status_page_id?: string
           updated_at?: string
           uptime?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "services_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_status_page_id_fkey"
             columns: ["status_page_id"]

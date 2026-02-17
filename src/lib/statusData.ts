@@ -6,7 +6,8 @@ export interface Service {
   status: ServiceStatus;
   uptime: number;
   uptimeDays: (boolean | null)[];
-  group_name?: string | null;
+  parent_id?: string | null;
+  children?: Service[];
 }
 
 export interface IncidentUpdate {
