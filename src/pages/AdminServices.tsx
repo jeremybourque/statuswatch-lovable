@@ -104,7 +104,7 @@ function PageDetailsSection({
 }: {
   page: { id: string; name: string; slug: string; description: string | null };
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [editName, setEditName] = useState(page.name);
   const [editSlug, setEditSlug] = useState(page.slug);
   const [editDesc, setEditDesc] = useState(page.description ?? "");
