@@ -67,38 +67,44 @@ const AdminNewPage = () => {
 
       <main className={`max-w-4xl mx-auto px-4 transition-all duration-500 ease-in-out ${selected ? "pt-6" : "py-16"}`}>
         <div className="max-w-2xl mx-auto">
-          {/* Button list */}
-          <div className="grid grid-cols-1 gap-4">
-            {choices.map((choice) => {
-              const Icon = choice.icon;
-              const isSelected = selected === choice.id;
-              const isHidden = selected !== null && !isSelected;
+          {/* Button list - reorder so selected is always first */}
+          <div className="flex flex-col gap-4">
+            {(() => {
+              const ordered = selected
+                ? [choices.find((c) => c.id === selected)!, ...choices.filter((c) => c.id !== selected)]
+                : choices;
 
-              return (
-                <div
-                  key={choice.id}
-                  className="transition-all duration-500 ease-in-out"
-                  style={{
-                    maxHeight: isHidden ? 0 : 100,
-                    opacity: isHidden ? 0 : 1,
-                    marginBottom: isHidden ? -16 : 0,
-                    overflow: "hidden",
-                  }}
-                >
-                  <Button
-                    variant="outline"
-                    className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-all duration-300 ${
-                      isSelected ? "border-primary bg-accent" : ""
-                    }`}
-                    onClick={() => !selected && setSelected(choice.id)}
-                    disabled={!!selected && !isSelected}
+              return ordered.map((choice) => {
+                const Icon = choice.icon;
+                const isSelected = selected === choice.id;
+                const isHidden = selected !== null && !isSelected;
+
+                return (
+                  <div
+                    key={choice.id}
+                    className="transition-all duration-500 ease-in-out"
+                    style={{
+                      maxHeight: isHidden ? 0 : 100,
+                      opacity: isHidden ? 0 : 1,
+                      padding: isHidden ? 0 : undefined,
+                      overflow: "hidden",
+                    }}
                   >
-                    <Icon className={`h-10 w-10 shrink-0 ${choice.iconClass}`} />
-                    {choice.label}
-                  </Button>
-                </div>
-              );
-            })}
+                    <Button
+                      variant="outline"
+                      className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-all duration-300 ${
+                        isSelected ? "border-primary bg-accent" : ""
+                      }`}
+                      onClick={() => !selected && setSelected(choice.id)}
+                      disabled={!!selected && !isSelected}
+                    >
+                      <Icon className={`h-10 w-10 shrink-0 ${choice.iconClass}`} />
+                      {choice.label}
+                    </Button>
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           {/* Expanded section */}
