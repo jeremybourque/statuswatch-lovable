@@ -68,12 +68,37 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
     const pageName = summary.page?.name || "Status Page";
 
+    // Also fetch /api/v2/components.json which may return more components
+    // than summary.json (summary can be truncated on some providers)
+    let allApiComponents: any[] = [...summary.components];
+    try {
+      const componentsRes = await fetch(`${origin}/api/v2/components.json`, {
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      });
+      if (componentsRes.ok) {
+        const componentsData = await componentsRes.json();
+        const fullList = componentsData?.components || [];
+        if (fullList.length > allApiComponents.length) {
+          // Merge: add any components not already in the summary
+          const existingIds = new Set(allApiComponents.map((c: any) => c.id));
+          for (const c of fullList) {
+            if (!existingIds.has(c.id)) {
+              allApiComponents.push(c);
+            }
+          }
+          console.log(`Merged components: summary had ${summary.components.length}, components.json had ${fullList.length}, total unique: ${allApiComponents.length}`);
+        }
+      }
+    } catch (_e) {
+      // components.json not available, continue with summary data
+    }
+
     progress("Parsing component list and group structure...");
 
     const groupInfoMap = new Map<string, { name: string; position: number }>();
     const childComponents: any[] = [];
 
-    for (const c of summary.components) {
+    for (const c of allApiComponents) {
       if (c.group) {
         groupInfoMap.set(c.id, { name: c.name, position: c.position ?? 0 });
       } else if (c.name !== pageName) {
