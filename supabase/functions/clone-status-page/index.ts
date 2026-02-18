@@ -414,8 +414,8 @@ function classifyUptimeClass(className: string): boolean | null | undefined {
 }
 /**
  * Detect group structure from rendered HTML when the API doesn't provide it.
- * Strategy: strip all HTML tags to get plain text, then find "N components" markers
- * and look backwards for the group name (which won't be a known service name).
+ * Strategy: find "N components" markers, extract group names, then assign services
+ * both by HTML position AND by filling remaining capacity for services not in HTML.
  */
 function detectGroupsFromHTML(
   html: string,
@@ -424,20 +424,17 @@ function detectGroupsFromHTML(
   const assignments = new Map<string, string>();
   const serviceNameSet = new Set(serviceNames);
 
-  // Approach 1: Search for "N component(s)" in the raw HTML and extract nearby text
-  // We look for the pattern in raw HTML, then scan backwards to find the group name
+  // Step 1: Find groups by searching for "N component(s)" markers
   const componentPattern = /(\d+)\s*components?/gi;
-  const groups: { name: string; index: number }[] = [];
+  // Deduplicate groups by name, keeping first occurrence
+  const groupMap = new Map<string, { index: number; expectedCount: number }>();
 
   let match: RegExpExecArray | null;
   while ((match = componentPattern.exec(html)) !== null) {
     const matchIdx = match.index;
-    // Look backwards up to 500 chars to find the group name
+    const expectedCount = parseInt(match[1], 10);
     const lookback = html.slice(Math.max(0, matchIdx - 500), matchIdx);
-    // Extract all text content from tags in the lookback region
-    // Find the last >text< before the "N components" marker
     const textMatches = [...lookback.matchAll(/>([^<]{2,})</g)];
-    // Walk backwards through text matches to find a non-service name
     let groupName: string | null = null;
     for (let i = textMatches.length - 1; i >= 0; i--) {
       const candidate = textMatches[i][1].trim();
@@ -450,21 +447,25 @@ function detectGroupsFromHTML(
         break;
       }
     }
-    if (groupName) {
-      // Use the position in the full HTML for ordering
-      groups.push({ name: groupName, index: matchIdx });
-      console.log(`  Group detected: "${groupName}" (${match[1]} components) at index ${matchIdx}`);
+    if (groupName && !groupMap.has(groupName)) {
+      groupMap.set(groupName, { index: matchIdx, expectedCount });
+      console.log(`  Group detected: "${groupName}" (${expectedCount} components) at index ${matchIdx}`);
     }
   }
 
-  if (groups.length === 0) {
+  if (groupMap.size === 0) {
     console.log("No groups detected from HTML");
     return assignments;
   }
 
-  console.log(`Detected ${groups.length} groups from HTML: ${groups.map(g => g.name).join(", ")}`);
+  const groups = [...groupMap.entries()].map(([name, info]) => ({
+    name, index: info.index, expectedCount: info.expectedCount,
+  }));
+  groups.sort((a, b) => a.index - b.index);
 
-  // For each service, find which group it belongs to by position in the HTML
+  console.log(`Detected ${groups.length} unique groups from HTML: ${groups.map(g => `${g.name}(${g.expectedCount})`).join(", ")}`);
+
+  // Step 2: Assign services found in HTML by position
   for (const serviceName of serviceNames) {
     const escapedName = serviceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const svcPattern = new RegExp(`>${escapedName}<`, 'g');
@@ -489,9 +490,68 @@ function detectGroupsFromHTML(
     }
   }
 
+  // Step 3: For services NOT found in HTML (inside collapsed/lazy-loaded groups),
+  // assign them to groups that still have remaining capacity
+  const unassigned = serviceNames.filter(s => !assignments.has(s));
+  if (unassigned.length > 0) {
+    // Count how many services are already assigned to each group
+    const groupCounts = new Map<string, number>();
+    for (const g of groups) groupCounts.set(g.name, 0);
+    for (const [, groupName] of assignments) {
+      groupCounts.set(groupName, (groupCounts.get(groupName) || 0) + 1);
+    }
+
+    // Also check which services are visible at top level (in HTML but not in any group)
+    const topLevelServices = new Set<string>();
+    for (const serviceName of serviceNames) {
+      if (!assignments.has(serviceName)) {
+        const escapedName = serviceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`>${escapedName}<`).test(html)) {
+          topLevelServices.add(serviceName);
+        }
+      }
+    }
+
+    // Services not in HTML AND not assigned = must be inside a collapsed group
+    const hiddenServices = unassigned.filter(s => !topLevelServices.has(s));
+    
+    if (hiddenServices.length > 0) {
+      // Build list of groups with remaining capacity
+      const groupsWithCapacity = groups
+        .map(g => ({
+          name: g.name,
+          remaining: g.expectedCount - (groupCounts.get(g.name) || 0),
+        }))
+        .filter(g => g.remaining > 0);
+
+      console.log(`  ${hiddenServices.length} hidden services to assign, groups with capacity: ${groupsWithCapacity.map(g => `${g.name}(${g.remaining} remaining)`).join(", ")}`);
+
+      // If only one group has remaining capacity, assign all hidden services there
+      if (groupsWithCapacity.length === 1) {
+        for (const svc of hiddenServices) {
+          assignments.set(svc, groupsWithCapacity[0].name);
+        }
+      } else if (groupsWithCapacity.length > 1) {
+        // Distribute: fill groups in order of their position on the page
+        // Use API position order of services to assign them sequentially
+        let groupIdx = 0;
+        let filled = 0;
+        for (const svc of hiddenServices) {
+          if (groupIdx >= groupsWithCapacity.length) break;
+          assignments.set(svc, groupsWithCapacity[groupIdx].name);
+          filled++;
+          if (filled >= groupsWithCapacity[groupIdx].remaining) {
+            groupIdx++;
+            filled = 0;
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`  Total assignments: ${assignments.size}/${serviceNames.length} services`);
   return assignments;
 }
-
 function parseSvgDeterministic(
   html: string,
   serviceNames: string[],
