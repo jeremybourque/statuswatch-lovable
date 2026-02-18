@@ -105,8 +105,33 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
     }
   }
 
+  const loadImageFromUrl = (url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        setImagePreview(url);
+        setMode("file");
+        resolve();
+      };
+      img.onerror = () => {
+        // Still show the URL as preview even if CORS blocks it
+        setImagePreview(url);
+        setMode("file");
+        resolve();
+      };
+      img.src = url;
+    });
+  };
+
   const handleAnalyze = async () => {
     if (!imageBase64 && !imageUrl.trim()) return;
+
+    // If in URL mode, load and display the image first
+    if (!imageBase64 && imageUrl.trim()) {
+      await loadImageFromUrl(imageUrl.trim());
+    }
+
     setAnalyzing(true);
     setPreviewData(null);
     setCollapsed(false);
