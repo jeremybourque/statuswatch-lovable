@@ -83,6 +83,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
   const [text, setText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzed, setAnalyzed] = useState<AnalyzedIncident | null>(null);
+  const [additionalIncidents, setAdditionalIncidents] = useState<AnalyzedIncident[]>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugManual, setSlugManual] = useState(false);
@@ -171,6 +172,36 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
     if (!slugManual) setSlug(slugify(val));
   };
 
+  const allIncidents = analyzed ? [analyzed, ...additionalIncidents] : [];
+
+  const updateIncident = (index: number, updater: (prev: AnalyzedIncident) => AnalyzedIncident) => {
+    if (index === 0) {
+      setAnalyzed((prev) => prev ? updater(prev) : prev);
+    } else {
+      setAdditionalIncidents((prev) => {
+        const updated = [...prev];
+        updated[index - 1] = updater(updated[index - 1]);
+        return updated;
+      });
+    }
+  };
+
+  const removeIncident = (index: number) => {
+    if (index === 0) return; // Don't remove the primary analyzed incident
+    setAdditionalIncidents((prev) => prev.filter((_, i) => i !== index - 1));
+  };
+
+  const addBlankIncident = () => {
+    const blank: AnalyzedIncident = {
+      title: "New Incident",
+      status: "investigating",
+      impact: "major",
+      services: [],
+      updates: [],
+    };
+    setAdditionalIncidents((prev) => [...prev, blank]);
+  };
+
   const handleCreate = async () => {
     if (!name.trim() || !slug.trim() || !analyzed) return;
     setCreating(true);
@@ -184,9 +215,10 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
         .single();
       if (pageErr) throw pageErr;
 
-      // Create services
-      if (analyzed.services.length > 0) {
-        const serviceRows = analyzed.services.map((s, i) => ({
+      // Collect all services from all incidents
+      const allServices = allIncidents.flatMap((inc) => inc.services);
+      if (allServices.length > 0) {
+        const serviceRows = allServices.map((s, i) => ({
           name: s.name,
           status: s.status,
           status_page_id: page.id,
@@ -197,35 +229,36 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
         if (sErr) throw sErr;
       }
 
-      // Create incident
-      const now = new Date().toISOString();
-      const incidentCreatedAt = analyzed.updates.length > 0
-        ? analyzed.updates[analyzed.updates.length - 1].timestamp
-        : now;
+      // Create all incidents
+      for (const inc of allIncidents) {
+        const now = new Date().toISOString();
+        const incidentCreatedAt = inc.updates.length > 0
+          ? inc.updates[inc.updates.length - 1].timestamp
+          : now;
 
-      const { data: createdInc, error: incErr } = await supabase
-        .from("incidents")
-        .insert({
-          status_page_id: page.id,
-          title: analyzed.title,
-          status: analyzed.status,
-          impact: analyzed.impact,
-          created_at: incidentCreatedAt,
-        })
-        .select("id")
-        .single();
-      if (incErr) throw incErr;
+        const { data: createdInc, error: incErr } = await supabase
+          .from("incidents")
+          .insert({
+            status_page_id: page.id,
+            title: inc.title,
+            status: inc.status,
+            impact: inc.impact,
+            created_at: incidentCreatedAt,
+          })
+          .select("id")
+          .single();
+        if (incErr) throw incErr;
 
-      // Create incident updates
-      if (analyzed.updates.length > 0) {
-        const updateRows = analyzed.updates.map((u) => ({
-          incident_id: createdInc.id,
-          status: u.status,
-          message: u.message,
-          created_at: u.timestamp,
-        }));
-        const { error: uErr } = await supabase.from("incident_updates").insert(updateRows);
-        if (uErr) console.error("Failed to insert incident updates:", uErr);
+        if (inc.updates.length > 0) {
+          const updateRows = inc.updates.map((u) => ({
+            incident_id: createdInc.id,
+            status: u.status,
+            message: u.message,
+            created_at: u.timestamp,
+          }));
+          const { error: uErr } = await supabase.from("incident_updates").insert(updateRows);
+          if (uErr) console.error("Failed to insert incident updates:", uErr);
+        }
       }
 
       toast({ title: "Status page created!" });
@@ -391,135 +424,150 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
 
           {/* Editable Incident Details */}
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">Incident Details</h2>
-            <div className="border border-border rounded-lg bg-card overflow-hidden">
-              {/* Incident header */}
-              <div className="p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-1.5 h-8 rounded-full ${updateStatusBg[analyzed.status]}`} />
-                  <input
-                    type="text"
-                    value={analyzed.title}
-                    onChange={(e) => setAnalyzed((prev) => prev ? { ...prev, title: e.target.value } : prev)}
-                    className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-                  />
-                </div>
-                <div className="flex items-center gap-4 ml-5">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">Status:</Label>
-                    <span className={`text-xs font-medium capitalize ${updateStatusColors[analyzed.status]}`}>{analyzed.status}</span>
+            <h2 className="text-xl font-semibold text-foreground">Incidents</h2>
+            {allIncidents.map((incident, incIndex) => (
+              <div key={incIndex} className="border border-border rounded-lg bg-card overflow-hidden">
+                {/* Incident header */}
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-1.5 h-8 rounded-full ${updateStatusBg[incident.status]}`} />
+                    <input
+                      type="text"
+                      value={incident.title}
+                      onChange={(e) => updateIncident(incIndex, (prev) => ({ ...prev, title: e.target.value }))}
+                      className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                    />
+                    {incIndex > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => removeIncident(incIndex)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 ml-5">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">Status:</Label>
+                      <span className={`text-xs font-medium capitalize ${updateStatusColors[incident.status]}`}>{incident.status}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="px-4 pb-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setAnalyzed((prev) => {
-                      if (!prev) return prev;
-                      const newUpdate: AnalyzedUpdate = {
-                        status: "investigating",
-                        message: "New update...",
-                        timestamp: new Date().toISOString(),
-                      };
-                      const updates = [newUpdate, ...prev.updates];
-                      return { ...prev, updates, status: newUpdate.status };
-                    });
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Update
-                </Button>
-              </div>
+                <div className="px-4 pb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      updateIncident(incIndex, (prev) => {
+                        const newUpdate: AnalyzedUpdate = {
+                          status: "investigating",
+                          message: "New update...",
+                          timestamp: new Date().toISOString(),
+                        };
+                        const updates = [newUpdate, ...prev.updates];
+                        return { ...prev, updates, status: newUpdate.status };
+                      });
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Update
+                  </Button>
+                </div>
 
-              {/* Editable updates timeline */}
-              {analyzed.updates.length > 0 && (
-                <div className="px-4 pb-4">
-                  <div className="ml-5 border-l-2 border-border pl-6 space-y-4">
-                    {analyzed.updates.map((update, i) => (
-                      <div key={i} className="relative">
-                        <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-border border-2 border-card" />
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={update.status}
-                                onValueChange={(val) => {
-                                  setAnalyzed((prev) => {
-                                    if (!prev) return prev;
-                                    const updates = [...prev.updates];
-                                    updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
-                                    const newStatus = i === 0 ? val as AnalyzedIncident["status"] : prev.status;
-                                    return { ...prev, updates, status: newStatus };
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="h-6 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-1">
-                                  <span className={`font-semibold capitalize ${updateStatusColors[update.status]}`}>
-                                    {update.status}
-                                  </span>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {updateStatuses.map((s) => (
-                                    <SelectItem key={s} value={s}>
-                                      <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <span className="text-sm text-muted-foreground">—</span>
-                              <input
-                                type="datetime-local"
-                                value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
+                {/* Editable updates timeline */}
+                {incident.updates.length > 0 && (
+                  <div className="px-4 pb-4">
+                    <div className="ml-5 border-l-2 border-border pl-6 space-y-4">
+                      {incident.updates.map((update, i) => (
+                        <div key={i} className="relative">
+                          <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-border border-2 border-card" />
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={update.status}
+                                  onValueChange={(val) => {
+                                    updateIncident(incIndex, (prev) => {
+                                      const updates = [...prev.updates];
+                                      updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
+                                      const newStatus = i === 0 ? val as AnalyzedIncident["status"] : prev.status;
+                                      return { ...prev, updates, status: newStatus };
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="h-6 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-1">
+                                    <span className={`font-semibold capitalize ${updateStatusColors[update.status]}`}>
+                                      {update.status}
+                                    </span>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {updateStatuses.map((s) => (
+                                      <SelectItem key={s} value={s}>
+                                        <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-sm text-muted-foreground">—</span>
+                                <input
+                                  type="datetime-local"
+                                  value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
+                                  onChange={(e) => {
+                                    updateIncident(incIndex, (prev) => {
+                                      const updates = [...prev.updates];
+                                      updates[i] = { ...updates[i], timestamp: new Date(e.target.value).toISOString() };
+                                      return { ...prev, updates };
+                                    });
+                                  }}
+                                  className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
+                                />
+                              </div>
+                              <textarea
+                                value={update.message}
                                 onChange={(e) => {
-                                  setAnalyzed((prev) => {
-                                    if (!prev) return prev;
+                                  updateIncident(incIndex, (prev) => {
                                     const updates = [...prev.updates];
-                                    updates[i] = { ...updates[i], timestamp: new Date(e.target.value).toISOString() };
+                                    updates[i] = { ...updates[i], message: e.target.value };
                                     return { ...prev, updates };
                                   });
                                 }}
-                                className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
+                                className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
+                                rows={2}
                               />
                             </div>
-                            <textarea
-                              value={update.message}
-                              onChange={(e) => {
-                                setAnalyzed((prev) => {
-                                  if (!prev) return prev;
-                                  const updates = [...prev.updates];
-                                  updates[i] = { ...updates[i], message: e.target.value };
-                                  return { ...prev, updates };
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 ml-2"
+                              onClick={() => {
+                                updateIncident(incIndex, (prev) => {
+                                  const updates = prev.updates.filter((_, idx) => idx !== i);
+                                  const newStatus = updates.length > 0 ? updates[0].status : prev.status;
+                                  return { ...prev, updates, status: newStatus };
                                 });
                               }}
-                              className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
-                              rows={2}
-                            />
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 ml-2"
-                            onClick={() => {
-                              setAnalyzed((prev) => {
-                                if (!prev) return prev;
-                                const updates = prev.updates.filter((_, idx) => idx !== i);
-                                const newStatus = updates.length > 0 ? updates[0].status : prev.status;
-                                return { ...prev, updates, status: newStatus };
-                              });
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addBlankIncident}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Incident
+            </Button>
           </div>
 
           <div className="flex items-center justify-between gap-3">
