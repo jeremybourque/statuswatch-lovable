@@ -20,6 +20,7 @@ export interface PreviewService {
   status: ServiceStatus;
   uptimeDays?: (boolean | null)[];
   uptime?: number;
+  group?: string;
 }
 
 export interface PreviewUpdate {
@@ -171,18 +172,59 @@ export function StatusPagePreview({
         ...incidents.flatMap((inc) => inc.services),
       ];
       if (allServices.length > 0) {
-        const serviceRows = allServices.map((s, i) => ({
+        // Determine unique group names for creating parent services
+        const groupNames = [...new Set(allServices.map((s) => s.group).filter(Boolean))] as string[];
+        const groupIdMap = new Map<string, string>();
+
+        // Create parent services for groups first
+        if (groupNames.length > 0) {
+          const parentRows = groupNames.map((gn, i) => ({
+            name: gn,
+            status: "operational",
+            status_page_id: page.id,
+            display_order: 1000 + i, // high order, will be re-ordered below
+            uptime: 99.99,
+          }));
+          const { data: parentServices, error: pErr } = await supabase
+            .from("services")
+            .insert(parentRows)
+            .select("id, name");
+          if (pErr) throw pErr;
+          if (parentServices) {
+            for (const ps of parentServices) {
+              groupIdMap.set(ps.name, ps.id);
+            }
+          }
+        }
+
+        // Create child/ungrouped services with parent_id
+        let displayOrder = 0;
+        const serviceRows = allServices.map((s) => ({
           name: s.name,
           status: s.status,
           status_page_id: page.id,
-          display_order: i,
+          display_order: displayOrder++,
           uptime: s.uptime ?? (s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0),
+          parent_id: s.group ? (groupIdMap.get(s.group) ?? null) : null,
         }));
         const { data: createdServices, error: sErr } = await supabase
           .from("services")
           .insert(serviceRows)
           .select("id");
         if (sErr) throw sErr;
+
+        // Update parent service display_order to match position in the list
+        // Parents appear before their first child
+        if (groupNames.length > 0) {
+          for (const [gIdx, gn] of groupNames.entries()) {
+            const firstChildIdx = allServices.findIndex((s) => s.group === gn);
+            const parentOrder = firstChildIdx >= 0 ? firstChildIdx : 1000 + gIdx;
+            const parentId = groupIdMap.get(gn);
+            if (parentId) {
+              await supabase.from("services").update({ display_order: parentOrder }).eq("id", parentId);
+            }
+          }
+        }
 
         // Save uptime_days for each service
         const uptimeRows: { service_id: string; day: string; up: boolean }[] = [];
@@ -192,7 +234,6 @@ export function StatusPagePreview({
             if (!serviceId || !s.uptimeDays) return;
             const today = new Date();
             const days = s.uptimeDays;
-            // uptimeDays is ordered oldest→newest, padded to 90 days
             days.forEach((up, dayIdx) => {
               if (up === null || up === undefined) return;
               const daysAgo = days.length - 1 - dayIdx;
@@ -292,80 +333,108 @@ export function StatusPagePreview({
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (
           <div className="border border-border rounded-lg divide-y divide-border">
-            {services.map((service, i) => (
-              <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                    <StatusDot status={service.status} />
-                    <input
-                      type="text"
-                      value={service.name}
-                      onChange={(e) => {
-                        setServices((prev) => {
-                          const updated = [...prev];
-                          updated[i] = { ...updated[i], name: e.target.value };
-                          return updated;
-                        });
-                      }}
-                      className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Select
-                      value={service.status}
-                      onValueChange={(val) => {
-                        setServices((prev) => {
-                          const updated = [...prev];
-                          updated[i] = { ...updated[i], status: val as ServiceStatus };
-                          return updated;
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
-                            {statusConfig[service.status]?.label}
-                          </span>
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            <div className="flex items-center gap-2">
-                              <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => {
-                        setServices((prev) => prev.filter((_, idx) => idx !== i));
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 ml-6">
-                  <TooltipProvider>
-                    <div className="flex-1 min-w-0">
-                      <UptimeBar days={(() => {
-                        const raw = service.uptimeDays ?? [];
-                        if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
-                        return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
-                      })()} />
+            {(() => {
+              // Group services: ungrouped first, then by group name
+              const ungrouped = services.filter((s) => !s.group);
+              const groupNames = [...new Set(services.map((s) => s.group).filter(Boolean))] as string[];
+
+              const renderService = (service: PreviewService, i: number, indent = false) => (
+                <div key={`${service.group ?? ''}-${i}`} className={`p-4 bg-card hover:bg-accent/50 transition-colors space-y-2 ${indent ? "pl-10" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                      <StatusDot status={service.status} />
+                      <input
+                        type="text"
+                        value={service.name}
+                        onChange={(e) => {
+                          setServices((prev) => {
+                            const idx = prev.indexOf(service);
+                            if (idx === -1) return prev;
+                            const updated = [...prev];
+                            updated[idx] = { ...updated[idx], name: e.target.value };
+                            return updated;
+                          });
+                        }}
+                        className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                      />
                     </div>
-                  </TooltipProvider>
-                  <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
-                    {(service.uptime ?? 100).toFixed(2)}%
-                  </span>
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={service.status}
+                        onValueChange={(val) => {
+                          setServices((prev) => {
+                            const idx = prev.indexOf(service);
+                            if (idx === -1) return prev;
+                            const updated = [...prev];
+                            updated[idx] = { ...updated[idx], status: val as ServiceStatus };
+                            return updated;
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                              {statusConfig[service.status]?.label}
+                            </span>
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>
+                              <div className="flex items-center gap-2">
+                                <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => {
+                          setServices((prev) => prev.filter((s) => s !== service));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-6">
+                    <TooltipProvider>
+                      <div className="flex-1 min-w-0">
+                        <UptimeBar days={(() => {
+                          const raw = service.uptimeDays ?? [];
+                          if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
+                          return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
+                        })()} />
+                      </div>
+                    </TooltipProvider>
+                    <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
+                      {(service.uptime ?? 100).toFixed(2)}%
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+
+              return (
+                <>
+                  {ungrouped.map((s, i) => renderService(s, i))}
+                  {groupNames.map((groupName) => {
+                    const groupServices = services.filter((s) => s.group === groupName);
+                    return (
+                      <div key={groupName}>
+                        <div className="px-4 py-3 bg-muted/50 font-semibold text-sm text-foreground flex items-center justify-between">
+                          <span>{groupName}</span>
+                          <span className="text-xs text-muted-foreground font-normal">{groupServices.length} components</span>
+                        </div>
+                        {groupServices.map((s, i) => renderService(s, i, true))}
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </div>
         )}
         <Button
