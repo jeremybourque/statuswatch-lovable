@@ -115,6 +115,10 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       if (!result.success || !result.data) throw new Error("No data returned");
 
       const data = result.data as AnalyzedIncident & { organization?: string };
+      // Sync incident status to the latest (first) update
+      if (data.updates.length > 0) {
+        data.status = data.updates[0].status;
+      }
       setAnalyzed(data);
 
       // Auto-fill name/slug only if organization is mentioned
@@ -376,21 +380,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                 <div className="flex items-center gap-4 ml-5">
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-muted-foreground">Status:</Label>
-                    <Select
-                      value={analyzed.status}
-                      onValueChange={(val) => setAnalyzed((prev) => prev ? { ...prev, status: val as AnalyzedIncident["status"] } : prev)}
-                    >
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-2">
-                        <span className={`font-medium capitalize ${updateStatusColors[analyzed.status]}`}>{analyzed.status}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {updateStatuses.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <span className={`text-xs font-medium capitalize ${updateStatusColors[analyzed.status]}`}>{analyzed.status}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-muted-foreground">Impact:</Label>
@@ -428,7 +418,8 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                                 if (!prev) return prev;
                                 const updates = [...prev.updates];
                                 updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
-                                return { ...prev, updates };
+                                const newStatus = i === 0 ? val as AnalyzedIncident["status"] : prev.status;
+                                return { ...prev, updates, status: newStatus };
                               });
                             }}
                           >
