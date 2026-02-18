@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Zap, PenLine } from "lucide-react";
+import { Loader2, Zap, PenLine, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
 
   const [text, setText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [previewData, setPreviewData] = useState<{
     services: PreviewService[];
     incidents: PreviewIncident[];
@@ -48,6 +49,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
     }
     setAnalyzing(true);
     setPreviewData(null);
+    setCollapsed(false);
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -91,6 +93,8 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
         slug: pageSlug,
       });
 
+      setCollapsed(true);
+
       toast({
         title: "Incident analyzed!",
         description: `Found ${data.services.length} affected services.`,
@@ -109,30 +113,56 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
   return (
     <div className="space-y-6">
       {/* Input section */}
-      <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-          <PenLine className="h-5 w-5" />
-          Describe the Incident
-        </h2>
-        <Textarea
-          placeholder={"Paste your incident status updates here, or describe what's happening...\n\nExample:\n\"Our API is experiencing elevated error rates. Database connections are timing out. The web dashboard is loading slowly. We identified the issue as a failed database migration and are rolling it back.\""}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="min-h-[160px] font-mono text-sm"
-          disabled={analyzing}
-        />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            AI will identify affected services and create a status page preview.
-          </p>
-          <Button onClick={handleAnalyze} disabled={analyzing || !text.trim()} className="shrink-0">
-            {analyzing ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <Zap className="h-4 w-4 mr-1" />
-            )}
-            {analyzing ? "Analyzing..." : "Analyze Incident"}
-          </Button>
+      <section
+        className={`border rounded-xl p-6 transition-colors duration-300 ${
+          collapsed
+            ? "border-border/50 bg-accent/50 cursor-pointer"
+            : "border-border bg-card"
+        }`}
+        onClick={collapsed ? () => setCollapsed(false) : undefined}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-semibold flex items-center gap-2 transition-colors duration-300 ${
+            collapsed ? "text-muted-foreground" : "text-card-foreground"
+          }`}>
+            <PenLine className="h-5 w-5" />
+            Describe the Incident
+          </h2>
+          {previewData && (
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${
+                collapsed ? "" : "rotate-180"
+              }`}
+            />
+          )}
+        </div>
+        <div
+          className={`transition-all duration-300 ease-in-out overflow-hidden ${
+            collapsed ? "max-h-0 opacity-0 mt-0" : "max-h-[600px] opacity-100 mt-4"
+          }`}
+        >
+          <div className="space-y-4">
+            <Textarea
+              placeholder={"Paste your incident status updates here, or describe what's happening...\n\nExample:\n\"Our API is experiencing elevated error rates. Database connections are timing out. The web dashboard is loading slowly. We identified the issue as a failed database migration and are rolling it back.\""}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className="min-h-[160px] font-mono text-sm"
+              disabled={analyzing}
+            />
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                AI will identify affected services and create a status page preview.
+              </p>
+              <Button onClick={(e) => { e.stopPropagation(); handleAnalyze(); }} disabled={analyzing || !text.trim()} className="shrink-0">
+                {analyzing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-1" />
+                )}
+                {analyzing ? "Analyzing..." : previewData ? "Re-analyze" : "Analyze Incident"}
+              </Button>
+            </div>
+          </div>
         </div>
       </section>
 
