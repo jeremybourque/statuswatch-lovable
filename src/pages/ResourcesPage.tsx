@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink } from "lucide-react";
+import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink, RefreshCw } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -106,10 +106,11 @@ function ResourceForm({
   );
 }
 
-function getFaviconUrl(siteUrl: string): string | null {
+function getFaviconUrl(siteUrl: string, bustCache?: number): string | null {
   try {
     const domain = new URL(siteUrl).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    const base = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    return bustCache ? `${base}&_=${bustCache}` : base;
   } catch {
     return null;
   }
@@ -117,6 +118,7 @@ function getFaviconUrl(siteUrl: string): string | null {
 
 function ResourceCard({ resource, navigate }: { resource: Resource; navigate: ReturnType<typeof useNavigate> }) {
   const [faviconError, setFaviconError] = useState(false);
+  const [cacheBust, setCacheBust] = useState<number | undefined>();
   const launchAction = () => {
     if (resource.type === "status_page" && resource.url) {
       navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(resource.url)}`);
@@ -133,19 +135,23 @@ function ResourceCard({ resource, navigate }: { resource: Resource; navigate: Re
     : resource.url;
 
   const actionLabel = resource.type === "status_page" ? "Clone" : "Analyze";
-  const faviconUrl = resource.type === "status_page" && resource.url ? getFaviconUrl(resource.url) : null;
+  const faviconUrl = resource.type === "status_page" && resource.url ? getFaviconUrl(resource.url, cacheBust) : null;
+
+  const refreshFavicon = () => {
+    setFaviconError(false);
+    setCacheBust(Date.now());
+  };
 
   return (
     <div className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/20 hover:bg-accent/50">
       {faviconUrl && !faviconError ? (
-        <img
-          src={faviconUrl}
-          alt=""
-          className="h-5 w-5 shrink-0 rounded"
-          onError={() => setFaviconError(true)}
-        />
+        <button onClick={refreshFavicon} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all" title="Refresh favicon">
+          <img src={faviconUrl} alt="" className="h-5 w-5 rounded" />
+        </button>
       ) : resource.type === "status_page" ? (
-        <Globe className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <button onClick={refreshFavicon} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Refresh favicon">
+          <RefreshCw className="h-5 w-5" />
+        </button>
       ) : null}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-foreground text-sm">{resource.name}</p>
