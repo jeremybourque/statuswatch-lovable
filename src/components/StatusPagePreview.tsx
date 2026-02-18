@@ -395,16 +395,14 @@ export function StatusPagePreview({
                   onChange={(e) => updateIncident(incIndex, (prev) => ({ ...prev, title: e.target.value }))}
                   className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
                 />
-                {incidents.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => removeIncident(incIndex)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => removeIncident(incIndex)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
               <div className="flex items-center gap-4 ml-5">
                 <div className="flex items-center gap-2">
