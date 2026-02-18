@@ -66,6 +66,13 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
         return;
       }
     }
+    // Check for pasted URL text
+    const text = e.clipboardData?.getData("text/plain")?.trim();
+    if (text && /^https?:\/\/.+/i.test(text)) {
+      e.preventDefault();
+      setMode("url");
+      setImageUrl(text);
+    }
   }, [processFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
