@@ -43,6 +43,10 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
 
   const handleAnalyze = async () => {
     if (!text.trim()) return;
+    if (previewData) {
+      const confirmed = window.confirm("This will clear the current preview. Continue?");
+      if (!confirmed) return;
+    }
     setAnalyzing(true);
     setPreviewData(null);
     setCollapsed(false);
@@ -112,15 +116,15 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       <section
         className={`border rounded-xl p-6 transition-colors duration-300 ${
           collapsed
-            ? "border-primary bg-accent"
+            ? "border-border/50 bg-accent/50 cursor-pointer"
             : "border-border bg-card"
         }`}
+        onClick={collapsed ? () => setCollapsed(false) : undefined}
       >
-        <div
-          className={`flex items-center justify-between ${previewData ? "cursor-pointer" : ""}`}
-          onClick={previewData ? () => setCollapsed(!collapsed) : undefined}
-        >
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-card-foreground">
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-semibold flex items-center gap-2 transition-colors duration-300 ${
+            collapsed ? "text-muted-foreground" : "text-card-foreground"
+          }`}>
             <PenLine className="h-5 w-5" />
             Describe the Incident
           </h2>
@@ -142,7 +146,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
               placeholder={"Paste your incident status updates here, or describe what's happening...\n\nExample:\n\"Our API is experiencing elevated error rates. Database connections are timing out. The web dashboard is loading slowly. We identified the issue as a failed database migration and are rolling it back.\""}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="min-h-[160px] font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/50"
+              className="min-h-[160px] font-mono text-sm"
               disabled={analyzing}
             />
             <div className="flex items-center justify-between gap-3">
