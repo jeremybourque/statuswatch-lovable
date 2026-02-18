@@ -412,6 +412,28 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                 </div>
               </div>
 
+              <div className="px-4 pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAnalyzed((prev) => {
+                      if (!prev) return prev;
+                      const newUpdate: AnalyzedUpdate = {
+                        status: "investigating",
+                        message: "New update...",
+                        timestamp: new Date().toISOString(),
+                      };
+                      const updates = [newUpdate, ...prev.updates];
+                      return { ...prev, updates, status: newUpdate.status };
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Update
+                </Button>
+              </div>
+
               {/* Editable updates timeline */}
               {analyzed.updates.length > 0 && (
                 <div className="px-4 pb-4">
@@ -497,27 +519,6 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                   </div>
                 </div>
               )}
-              <div className="px-4 pb-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setAnalyzed((prev) => {
-                      if (!prev) return prev;
-                      const newUpdate: AnalyzedUpdate = {
-                        status: "investigating",
-                        message: "New update...",
-                        timestamp: new Date().toISOString(),
-                      };
-                      const updates = [newUpdate, ...prev.updates];
-                      return { ...prev, updates, status: newUpdate.status };
-                    });
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Update
-                </Button>
-              </div>
             </div>
           </div>
 
