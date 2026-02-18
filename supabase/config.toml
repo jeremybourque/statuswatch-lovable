@@ -2,3 +2,6 @@ project_id = "mlbvjpiwitfmhlgxpkqv"
 
 [functions.analyze-incident]
 verify_jwt = false
+
+[functions.analyze-diagram]
+verify_jwt = false
