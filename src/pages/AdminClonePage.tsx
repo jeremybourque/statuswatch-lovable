@@ -225,7 +225,7 @@ export function ClonePageContent() {
   return (
     <div className="space-y-6">
       {/* URL input */}
-      <section className="border border-border rounded-xl bg-card p-6 space-y-4">
+      <section className={`border rounded-xl p-6 space-y-4 transition-colors duration-300 ${extracted && !fetching && !urlCardExpanded ? "border-primary bg-accent" : "border-border bg-card"}`}>
         {extracted && !fetching ? (
           <>
             <button
