@@ -290,9 +290,21 @@ export function IncidentPageContent() {
                 {analyzed.services.map((service, i) => {
                   return (
                     <div key={i} className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
                         <StatusDot status={service.status} />
-                        <span className="font-medium text-card-foreground">{service.name}</span>
+                        <input
+                          type="text"
+                          value={service.name}
+                          onChange={(e) => {
+                            setAnalyzed((prev) => {
+                              if (!prev) return prev;
+                              const updated = [...prev.services];
+                              updated[i] = { ...updated[i], name: e.target.value };
+                              return { ...prev, services: updated };
+                            });
+                          }}
+                          className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent/30 focus:bg-accent/30 rounded px-1 -mx-1 transition-colors"
+                        />
                       </div>
                       <Select
                         value={service.status}
