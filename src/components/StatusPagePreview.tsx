@@ -340,16 +340,20 @@ export function StatusPagePreview({
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (() => {
-          // Group services preserving original order: consecutive services with the same group
-          // are collected together; ungrouped services each form their own block.
+          // Group services: all services sharing the same group name are collected
+          // into a single block. The block order follows the first appearance of each
+          // group (or ungrouped service) in the array. Within each group the original
+          // order is preserved.
           const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
+          const groupIndex = new Map<string, number>(); // group name → index in groups[]
+
           services.forEach((service, i) => {
             const g = service.group || null;
-            const last = groups.length > 0 ? groups[groups.length - 1] : null;
-            if (g && last && last.group === g) {
-              // Same named group as previous — append
-              last.items.push({ service, originalIndex: i });
+            if (g && groupIndex.has(g)) {
+              // Append to existing named group
+              groups[groupIndex.get(g)!].items.push({ service, originalIndex: i });
             } else {
+              if (g) groupIndex.set(g, groups.length);
               groups.push({ group: g, items: [{ service, originalIndex: i }] });
             }
           });
