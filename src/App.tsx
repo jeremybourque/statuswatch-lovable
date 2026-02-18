@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import StatusPagesIndex from "./pages/StatusPagesIndex";
 import StatusPageDetail from "./pages/StatusPageDetail";
-import AdminDashboard from "./pages/AdminDashboard";
 import AdminNewPage from "./pages/AdminNewPage";
 import AdminServices from "./pages/AdminServices";
 import AdminClonePage from "./pages/AdminClonePage";
@@ -21,7 +20,6 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<StatusPagesIndex />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/new" element={<AdminNewPage />} />
           <Route path="/:slug/edit" element={<AdminServices />} />
           <Route path="/admin/clone" element={<AdminClonePage />} />

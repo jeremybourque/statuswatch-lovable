@@ -39,7 +39,7 @@ const choices = [
 const AdminNewPage = () => {
   const [searchParams] = useSearchParams();
   const from = searchParams.get("from");
-  const backTo = from === "admin" ? "/admin" : "/";
+  const backTo = "/";
 
   const [selected, setSelected] = useState<Choice | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);

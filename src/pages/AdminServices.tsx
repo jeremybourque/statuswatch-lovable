@@ -776,7 +776,7 @@ const AdminServices = () => {
     }
     toast({ title: `"${page.name}" deleted` });
     queryClient.invalidateQueries({ queryKey: ["status-pages"] });
-    navigate(from === "admin" ? "/admin" : "/");
+    navigate("/");
   };
 
   const isLoading = pageLoading || servicesLoading || incidentsLoading;
@@ -797,7 +797,7 @@ const AdminServices = () => {
               <Trash2 className="h-4 w-4 mr-1" />
               Delete Page
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate(from === "status" ? `/${slug}` : "/admin")}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(from === "status" ? `/${slug}` : "/")}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
