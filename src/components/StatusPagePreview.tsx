@@ -114,15 +114,13 @@ function CollapsibleGroup({
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
             {groupName}
           </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
-            {statusConfig[groupStatus].label}
-          </span>
           <ChevronDown
             className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`}
           />
         </div>
+        <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
+          {statusConfig[groupStatus].label}
+        </span>
       </button>
       {!collapsed && (
         <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
