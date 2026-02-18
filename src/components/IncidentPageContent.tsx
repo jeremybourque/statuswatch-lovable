@@ -76,7 +76,7 @@ function StatusDot({ status }: { status: ServiceStatus }) {
   );
 }
 
-export function IncidentPageContent() {
+export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string }) {
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -225,7 +225,7 @@ export function IncidentPageContent() {
       }
 
       toast({ title: "Status page created!" });
-      navigate(`/${slug}`);
+      navigate(navigateTo);
     } catch (err: any) {
       toast({
         title: "Failed to create",

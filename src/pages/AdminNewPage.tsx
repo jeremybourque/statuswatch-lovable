@@ -146,7 +146,7 @@ const AdminNewPage = () => {
             }}
           >
             {selected === "clone" && <ClonePageContent />}
-            {selected === "incident" && <IncidentPageContent />}
+            {selected === "incident" && <IncidentPageContent navigateTo={backTo} />}
             {selected && selected !== "clone" && selected !== "incident" && (
               <div className="border border-border rounded-lg p-8 bg-card">
                 <p className="text-muted-foreground text-center">
