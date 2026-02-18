@@ -327,8 +327,7 @@ function extractGroupsAndOrderFromHtml(
   }
 
   return { groupMap, orderedNames };
-
-
+}
 
 // ── Incident extraction via Atlassian API ──
 
