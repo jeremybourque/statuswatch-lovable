@@ -395,9 +395,9 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   // Sort newest first
   allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // For incidents with empty update messages, scrape the incident HTML pages (limit to 10 to avoid timeout)
+  // For incidents with empty update messages, scrape the incident HTML pages
   const incidentsNeedingDetail = allIncidents.filter(
-    (inc, i) => inc.updates.some(u => !u.message.trim()) && i < 10
+    (inc) => inc.updates.some(u => !u.message.trim())
   );
 
   if (incidentsNeedingDetail.length > 0) {
