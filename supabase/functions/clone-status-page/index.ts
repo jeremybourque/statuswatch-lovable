@@ -170,6 +170,24 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
       }
 
       progress(`Parsed uptime bars for ${matchedCount}/${services.length} services`);
+
+      // Detect group structure from HTML if API didn't provide groups
+      const hasApiGroups = services.some(s => s.group);
+      if (!hasApiGroups) {
+        progress("Detecting group structure from page HTML...");
+        const groupAssignments = detectGroupsFromHTML(rawHtml, serviceNames);
+        let groupedCount = 0;
+        for (const svc of services) {
+          const group = groupAssignments.get(svc.name);
+          if (group) {
+            svc.group = group;
+            groupedCount++;
+          }
+        }
+        if (groupedCount > 0) {
+          progress(`Assigned ${groupedCount} services to groups from page structure`);
+        }
+      }
     } catch (e: any) {
       progress(`Could not scrape uptime bars: ${e.message}`);
       console.log("Could not scrape uptime bars:", e.message);
@@ -394,6 +412,69 @@ function classifyUptimeClass(className: string): boolean | null | undefined {
   if (/pill|bar|uptime|chart/.test(cl)) return null;
   return undefined; // unrecognized
 }
+/**
+ * Detect group structure from rendered HTML when the API doesn't provide it.
+ * Looks for patterns like a group header name followed by "N components" text,
+ * then assigns child services that appear between this group header and the next.
+ */
+function detectGroupsFromHTML(
+  html: string,
+  serviceNames: string[],
+): Map<string, string> {
+  const assignments = new Map<string, string>();
+
+  // Find group headers: text like "On-call notifications" followed by "N component(s)"
+  // Pattern: a service-like name that's NOT in our service list, followed by "N components"
+  const groupPattern = />([\w@\-. ]+?)<[^>]*>[^<]*?(\d+)\s*components?/gi;
+  const groups: { name: string; index: number }[] = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = groupPattern.exec(html)) !== null) {
+    const groupName = match[1].trim();
+    // Only treat as group if it's not already a known service
+    if (groupName && !serviceNames.includes(groupName)) {
+      groups.push({ name: groupName, index: match.index });
+    }
+  }
+
+  if (groups.length === 0) return assignments;
+
+  console.log(`Detected ${groups.length} groups from HTML: ${groups.map(g => g.name).join(", ")}`);
+
+  // For each service, find which group it belongs to by checking
+  // if the service name appears after a group header in the HTML
+  const serviceNameSet = new Set(serviceNames);
+
+  for (const serviceName of serviceNames) {
+    // Find all occurrences of this service name in the HTML
+    const escapedName = serviceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const svcPattern = new RegExp(`>${escapedName}<`, 'g');
+    let svcMatch: RegExpExecArray | null;
+    let bestGroup: string | null = null;
+
+    while ((svcMatch = svcPattern.exec(html)) !== null) {
+      // Find the closest group header that appears BEFORE this service
+      for (let i = groups.length - 1; i >= 0; i--) {
+        if (groups[i].index < svcMatch.index) {
+          // Check there isn't a closer group after this one
+          const nextGroupIdx = i < groups.length - 1 ? groups[i + 1].index : Infinity;
+          if (svcMatch.index < nextGroupIdx) {
+            bestGroup = groups[i].name;
+          }
+          break;
+        }
+      }
+      if (bestGroup) break;
+    }
+
+    if (bestGroup) {
+      assignments.set(serviceName, bestGroup);
+    }
+  }
+
+  return assignments;
+}
+
 function parseSvgDeterministic(
   html: string,
   serviceNames: string[],
