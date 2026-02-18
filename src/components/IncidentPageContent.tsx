@@ -258,8 +258,11 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
           className="min-h-[160px] font-mono text-sm"
           disabled={analyzing}
         />
-        <div className="flex items-center gap-3 flex-row-reverse">
-          <Button onClick={handleAnalyze} disabled={analyzing || !text.trim()}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            AI will identify affected services and create a status page preview.
+          </p>
+          <Button onClick={handleAnalyze} disabled={analyzing || !text.trim()} className="shrink-0">
             {analyzing ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
             ) : (
@@ -267,9 +270,6 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
             )}
             {analyzing ? "Analyzing..." : "Analyze Incident"}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            AI will identify affected services and create a status page preview.
-          </p>
         </div>
       </section>
 
