@@ -7,6 +7,7 @@ const updateStatusColors: Record<string, string> = {
   investigating: "text-status-major",
   identified: "text-status-partial",
   monitoring: "text-status-degraded",
+  maintenance: "text-status-maintenance",
   resolved: "text-status-operational",
 };
 
@@ -14,6 +15,7 @@ const updateStatusBg: Record<string, string> = {
   investigating: "bg-status-major",
   identified: "bg-status-partial",
   monitoring: "bg-status-degraded",
+  maintenance: "bg-status-maintenance",
   resolved: "bg-status-operational",
 };
 

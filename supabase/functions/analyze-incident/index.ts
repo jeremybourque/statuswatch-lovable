@@ -68,7 +68,7 @@ You MUST use the extract_incident_data tool to return your analysis.`;
                   title: { type: "string", description: "Concise incident title" },
                   status: {
                     type: "string",
-                    enum: ["investigating", "identified", "monitoring", "resolved"],
+                    enum: ["investigating", "identified", "monitoring", "maintenance", "resolved"],
                   },
                   impact: {
                     type: "string",
@@ -97,7 +97,7 @@ You MUST use the extract_incident_data tool to return your analysis.`;
                       properties: {
                         status: {
                           type: "string",
-                          enum: ["investigating", "identified", "monitoring", "resolved"],
+                          enum: ["investigating", "identified", "monitoring", "maintenance", "resolved"],
                         },
                         message: { type: "string" },
                         timestamp: {
