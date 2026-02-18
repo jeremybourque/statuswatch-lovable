@@ -776,7 +776,7 @@ const AdminServices = () => {
     }
     toast({ title: `"${page.name}" deleted` });
     queryClient.invalidateQueries({ queryKey: ["status-pages"] });
-    navigate(from === "status" ? `/${slug}` : from === "admin" ? "/admin" : "/");
+    navigate(from === "admin" ? "/admin" : "/");
   };
 
   const isLoading = pageLoading || servicesLoading || incidentsLoading;
