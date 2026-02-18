@@ -224,6 +224,17 @@ const ResourcesPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
+                        {r.type === "status_page" && r.url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Clone this status page"
+                            onClick={() => navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(r.url!)}`)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {r.type === "system_diagram" && r.url && (
                           <Button
                             variant="ghost"

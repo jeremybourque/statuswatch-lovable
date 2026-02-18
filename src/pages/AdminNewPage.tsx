@@ -43,6 +43,7 @@ const AdminNewPage = () => {
   const from = searchParams.get("from");
   const initialChoice = searchParams.get("choice") as Choice | null;
   const diagramUrl = searchParams.get("diagramUrl");
+  const cloneUrl = searchParams.get("cloneUrl");
   const [incidentDescription] = useState<string | undefined>(() => {
     if (initialChoice === "incident") {
       const stored = sessionStorage.getItem("preloadIncidentDescription");
@@ -159,7 +160,7 @@ const AdminNewPage = () => {
               marginTop: selected ? GAP : 0,
             }}
           >
-            {selected === "clone" && <ClonePageContent />}
+            {selected === "clone" && <ClonePageContent initialUrl={cloneUrl || undefined} />}
             {selected === "incident" && <IncidentPageContent navigateTo={backTo} initialDescription={incidentDescription} />}
             {selected === "diagram" && <DiagramPageContent navigateTo={backTo} initialUrl={diagramUrl || undefined} />}
             {selected === "manual" && (
