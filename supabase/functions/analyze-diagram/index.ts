@@ -37,22 +37,52 @@ You MUST use the extract_services tool to return your analysis.`;
       { type: "text", text: "Analyze this system diagram and extract all services and components:" },
     ];
 
-    if (imageBase64) {
-      // Detect mime type from base64 header or default to png
-      let mimeType = "image/png";
-      if (imageBase64.startsWith("/9j/")) mimeType = "image/jpeg";
-      else if (imageBase64.startsWith("iVBOR")) mimeType = "image/png";
-      else if (imageBase64.startsWith("R0lGOD")) mimeType = "image/gif";
-      else if (imageBase64.startsWith("UklGR")) mimeType = "image/webp";
+    let finalBase64 = imageBase64;
+    let mimeType = "image/png";
 
+    if (!finalBase64 && imageUrl) {
+      // Fetch the image server-side to handle SVGs, redirects, etc.
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) {
+        return new Response(JSON.stringify({ error: `Failed to fetch image from URL (${imgRes.status})` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const contentType = imgRes.headers.get("content-type") || "";
+      // Reject non-image content
+      if (!contentType.startsWith("image/")) {
+        return new Response(JSON.stringify({ error: `URL did not return an image (got ${contentType})` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      mimeType = contentType.split(";")[0].trim();
+      // Gemini does not support SVG — reject early with a clear message
+      if (mimeType === "image/svg+xml") {
+        return new Response(JSON.stringify({ error: "SVG images are not supported. Please use a PNG, JPEG, or WebP image instead." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const arrayBuf = await imgRes.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      finalBase64 = btoa(binary);
+    }
+
+    if (finalBase64) {
+      // Detect mime from base64 header if not already set from fetch
+      if (imageBase64) {
+        if (finalBase64.startsWith("/9j/")) mimeType = "image/jpeg";
+        else if (finalBase64.startsWith("iVBOR")) mimeType = "image/png";
+        else if (finalBase64.startsWith("R0lGOD")) mimeType = "image/gif";
+        else if (finalBase64.startsWith("UklGR")) mimeType = "image/webp";
+      }
       userContent.push({
         type: "image_url",
-        image_url: { url: `data:${mimeType};base64,${imageBase64}` },
-      });
-    } else if (imageUrl) {
-      userContent.push({
-        type: "image_url",
-        image_url: { url: imageUrl },
+        image_url: { url: `data:${mimeType};base64,${finalBase64}` },
       });
     }
 
@@ -131,6 +161,16 @@ You MUST use the extract_services tool to return your analysis.`;
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+      if (aiRes.status === 400) {
+        try {
+          const parsed = JSON.parse(errText);
+          const msg = parsed?.error?.message || "The image could not be processed. Try a different format (PNG, JPEG, WebP).";
+          return new Response(JSON.stringify({ error: msg }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch { /* fall through */ }
       }
       throw new Error("AI analysis failed");
     }
