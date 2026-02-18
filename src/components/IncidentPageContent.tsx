@@ -258,7 +258,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
           className="min-h-[160px] font-mono text-sm"
           disabled={analyzing}
         />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-row-reverse">
           <Button onClick={handleAnalyze} disabled={analyzing || !text.trim()}>
             {analyzing ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
