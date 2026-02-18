@@ -529,6 +529,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                               </div>
                               <textarea
                                 value={update.message}
+                                onFocus={(e) => { if (e.target.value === "New update...") e.target.select(); }}
                                 onChange={(e) => {
                                   updateIncident(incIndex, (prev) => {
                                     const updates = [...prev.updates];
