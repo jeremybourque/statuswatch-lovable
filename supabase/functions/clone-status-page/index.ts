@@ -687,6 +687,26 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, 
   }
 }
 
+function expandAllScript(): string {
+  return [
+    // Aria-expanded elements
+    `document.querySelectorAll('[aria-expanded="false"]').forEach(el => el.click());`,
+    // Atlassian collapsed components
+    `document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); });`,
+    // MUI accordions
+    `document.querySelectorAll('.MuiAccordionSummary-root, .MuiButtonBase-root[aria-expanded="false"], [class*="collapsed"], [class*="Collapsed"], [class*="expandable"], [class*="Expandable"]').forEach(el => el.click());`,
+    `document.querySelectorAll('.MuiCollapse-hidden, .MuiCollapse-wrapper').forEach(el => { el.style.height = 'auto'; el.style.visibility = 'visible'; });`,
+    // incident.io & Radix: click "N components" buttons
+    `document.querySelectorAll('button, [role="button"], [class*="cursor-pointer"], div[class*="cursor-pointer"]').forEach(el => { if (/\\d+\\s*components?/i.test(el.textContent || '')) el.click(); });`,
+    // Radix data-state
+    `document.querySelectorAll('[data-state="closed"]').forEach(el => { if (el.click) el.click(); });`,
+    // incident.io specific: expand group containers by clicking any chevron/caret SVGs inside group headers
+    `document.querySelectorAll('svg[class*="chevron"], svg[class*="caret"], svg[class*="arrow"]').forEach(svg => { const btn = svg.closest('button, [role="button"], [class*="cursor-pointer"]'); if (btn) btn.click(); });`,
+    // Force open any hidden content containers
+    `document.querySelectorAll('[class*="hidden"], [class*="collapse"]:not(.show)').forEach(el => { if (el.classList.contains('hidden')) el.classList.remove('hidden'); el.style.display = 'block'; el.style.height = 'auto'; el.style.overflow = 'visible'; });`,
+  ].join(' ');
+}
+
 async function fetchRenderedHTML(url: string): Promise<string> {
   const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
   if (!firecrawlKey) {
@@ -706,10 +726,20 @@ async function fetchRenderedHTML(url: string): Promise<string> {
       onlyMainContent: false,
       waitFor: 5000,
       actions: [
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); }); document.querySelectorAll('.MuiAccordionSummary-root, .MuiButtonBase-root[aria-expanded=\"false\"], [class*=\"collapsed\"], [class*=\"Collapsed\"], [class*=\"expandable\"], [class*=\"Expandable\"]').forEach(el => el.click()); document.querySelectorAll('.MuiCollapse-hidden, .MuiCollapse-wrapper').forEach(el => { el.style.height = 'auto'; el.style.visibility = 'visible'; }); document.querySelectorAll('button, [role=\"button\"], [class*=\"cursor-pointer\"]').forEach(el => { if (/\\d+\\s*components?/i.test(el.textContent)) el.click(); }); document.querySelectorAll('[data-state=\"closed\"]').forEach(el => { if (el.click) el.click(); });" },
+        // First scroll to bottom to trigger any lazy-loaded content
+        { type: "scroll", direction: "down", amount: 9999 },
+        { type: "wait", milliseconds: 2000 },
+        { type: "scroll", direction: "up", amount: 9999 },
+        { type: "wait", milliseconds: 1000 },
+        // First expansion pass - click everything expandable
+        { type: "executeJavascript", script: expandAllScript() },
         { type: "wait", milliseconds: 3000 },
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('[data-state=\"closed\"]').forEach(el => { if (el.click) el.click(); }); document.querySelectorAll('button, [role=\"button\"], [class*=\"cursor-pointer\"]').forEach(el => { if (/\\d+\\s*components?/i.test(el.textContent)) el.click(); });" },
+        // Second pass to catch nested or delayed expansions
+        { type: "executeJavascript", script: expandAllScript() },
         { type: "wait", milliseconds: 3000 },
+        // Third pass for deeply nested
+        { type: "executeJavascript", script: expandAllScript() },
+        { type: "wait", milliseconds: 2000 },
       ],
     }),
   });
@@ -751,10 +781,16 @@ async function fetchRenderedHTMLForUptime(url: string, progress: ProgressFn): Pr
       onlyMainContent: false,
       waitFor: 5000,
       actions: [
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('.component-container.collapsed, details:not([open])').forEach(el => { if (el.tagName === 'DETAILS') el.setAttribute('open',''); else el.click(); }); document.querySelectorAll('.MuiAccordionSummary-root, .MuiButtonBase-root[aria-expanded=\"false\"], [class*=\"collapsed\"], [class*=\"Collapsed\"], [class*=\"expandable\"], [class*=\"Expandable\"]').forEach(el => el.click()); document.querySelectorAll('.MuiCollapse-hidden, .MuiCollapse-wrapper').forEach(el => { el.style.height = 'auto'; el.style.visibility = 'visible'; }); /* incident.io: click group expansion buttons showing 'N components' */ document.querySelectorAll('button, [role=\"button\"], [class*=\"cursor-pointer\"]').forEach(el => { if (/\\d+\\s*components?/i.test(el.textContent)) el.click(); }); document.querySelectorAll('[data-state=\"closed\"]').forEach(el => { if (el.click) el.click(); });" },
+        { type: "scroll", direction: "down", amount: 9999 },
+        { type: "wait", milliseconds: 2000 },
+        { type: "scroll", direction: "up", amount: 9999 },
+        { type: "wait", milliseconds: 1000 },
+        { type: "executeJavascript", script: expandAllScript() },
         { type: "wait", milliseconds: 3000 },
-        { type: "executeJavascript", script: "document.querySelectorAll('[aria-expanded=\"false\"]').forEach(el => el.click()); document.querySelectorAll('[data-state=\"closed\"]').forEach(el => { if (el.click) el.click(); }); document.querySelectorAll('button, [role=\"button\"], [class*=\"cursor-pointer\"]').forEach(el => { if (/\\d+\\s*components?/i.test(el.textContent)) el.click(); });" },
+        { type: "executeJavascript", script: expandAllScript() },
         { type: "wait", milliseconds: 3000 },
+        { type: "executeJavascript", script: expandAllScript() },
+        { type: "wait", milliseconds: 2000 },
       ],
     }),
   });
