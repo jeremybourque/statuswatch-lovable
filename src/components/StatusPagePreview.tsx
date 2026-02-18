@@ -243,7 +243,7 @@ export function StatusPagePreview({
           placeholder="Page Name"
           className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 flex-1 min-w-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
         />
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0 shrink-0">
           <span className="text-sm text-muted-foreground">/</span>
           <input
             type="text"
