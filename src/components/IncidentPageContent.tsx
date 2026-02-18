@@ -417,52 +417,69 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                 <div className="px-4 pb-4">
                   <div className="ml-5 border-l-2 border-border pl-6 space-y-4">
                     {analyzed.updates.map((update, i) => (
-                      <div key={i} className="relative group">
+                      <div key={i} className="relative">
                         <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-border border-2 border-card" />
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={update.status}
-                            onValueChange={(val) => {
-                              setAnalyzed((prev) => {
-                                if (!prev) return prev;
-                                const updates = [...prev.updates];
-                                updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
-                                const newStatus = i === 0 ? val as AnalyzedIncident["status"] : prev.status;
-                                return { ...prev, updates, status: newStatus };
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="h-6 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-1">
-                              <span className={`font-semibold capitalize ${updateStatusColors[update.status]}`}>
-                                {update.status}
-                              </span>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {updateStatuses.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <span className="text-sm text-muted-foreground">—</span>
-                          <input
-                            type="datetime-local"
-                            value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
-                            onChange={(e) => {
-                              setAnalyzed((prev) => {
-                                if (!prev) return prev;
-                                const updates = [...prev.updates];
-                                updates[i] = { ...updates[i], timestamp: new Date(e.target.value).toISOString() };
-                                return { ...prev, updates };
-                              });
-                            }}
-                            className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
-                          />
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={update.status}
+                                onValueChange={(val) => {
+                                  setAnalyzed((prev) => {
+                                    if (!prev) return prev;
+                                    const updates = [...prev.updates];
+                                    updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
+                                    const newStatus = i === 0 ? val as AnalyzedIncident["status"] : prev.status;
+                                    return { ...prev, updates, status: newStatus };
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="h-6 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-1">
+                                  <span className={`font-semibold capitalize ${updateStatusColors[update.status]}`}>
+                                    {update.status}
+                                  </span>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {updateStatuses.map((s) => (
+                                    <SelectItem key={s} value={s}>
+                                      <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <span className="text-sm text-muted-foreground">—</span>
+                              <input
+                                type="datetime-local"
+                                value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
+                                onChange={(e) => {
+                                  setAnalyzed((prev) => {
+                                    if (!prev) return prev;
+                                    const updates = [...prev.updates];
+                                    updates[i] = { ...updates[i], timestamp: new Date(e.target.value).toISOString() };
+                                    return { ...prev, updates };
+                                  });
+                                }}
+                                className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
+                              />
+                            </div>
+                            <textarea
+                              value={update.message}
+                              onChange={(e) => {
+                                setAnalyzed((prev) => {
+                                  if (!prev) return prev;
+                                  const updates = [...prev.updates];
+                                  updates[i] = { ...updates[i], message: e.target.value };
+                                  return { ...prev, updates };
+                                });
+                              }}
+                              className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
+                              rows={2}
+                            />
+                          </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 ml-2"
                             onClick={() => {
                               setAnalyzed((prev) => {
                                 if (!prev) return prev;
@@ -475,19 +492,6 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                        <textarea
-                          value={update.message}
-                          onChange={(e) => {
-                            setAnalyzed((prev) => {
-                              if (!prev) return prev;
-                              const updates = [...prev.updates];
-                              updates[i] = { ...updates[i], message: e.target.value };
-                              return { ...prev, updates };
-                            });
-                          }}
-                          className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
-                          rows={2}
-                        />
                       </div>
                     ))}
                   </div>
