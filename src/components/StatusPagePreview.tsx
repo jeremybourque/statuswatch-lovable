@@ -172,17 +172,40 @@ export function StatusPagePreview({
         ...incidents.flatMap((inc) => inc.services),
       ];
       if (allServices.length > 0) {
-        // Determine unique groups
-        const groupNames = [...new Set(allServices.map((s) => s.group).filter(Boolean))] as string[];
+        // Build ordered groups matching visual order
+        const orderedGroups: { group: string | null; items: PreviewService[] }[] = [];
+        for (const s of allServices) {
+          const g = s.group || null;
+          const existing = orderedGroups.find((gr) => gr.group === g);
+          if (existing) {
+            existing.items.push(s);
+          } else {
+            orderedGroups.push({ group: g, items: [s] });
+          }
+        }
 
-        // Create parent services for groups
+        // Create parent services for groups with correct display_order
         const parentMap = new Map<string, string>();
+        let orderCounter = 0;
+        const parentOrderMap = new Map<string, number>();
+
+        for (const grp of orderedGroups) {
+          if (grp.group) {
+            parentOrderMap.set(grp.group, orderCounter);
+            orderCounter++; // parent takes one slot
+            orderCounter += grp.items.length; // reserve slots for children
+          } else {
+            orderCounter += grp.items.length;
+          }
+        }
+
+        const groupNames = [...parentOrderMap.keys()];
         if (groupNames.length > 0) {
-          const parentRows = groupNames.map((g, i) => ({
+          const parentRows = groupNames.map((g) => ({
             name: g,
             status: "operational",
             status_page_id: page.id,
-            display_order: i,
+            display_order: parentOrderMap.get(g)!,
             uptime: 100,
           }));
           const { data: createdParents, error: pErr } = await supabase
@@ -193,15 +216,26 @@ export function StatusPagePreview({
           createdParents?.forEach((p) => parentMap.set(p.name, p.id));
         }
 
-        // Create child / ungrouped services
-        const serviceRows = allServices.map((s, i) => ({
-          name: s.name,
-          status: s.status,
-          status_page_id: page.id,
-          display_order: groupNames.length + i,
-          uptime: s.uptime ?? (s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0),
-          parent_id: s.group ? (parentMap.get(s.group) ?? null) : null,
-        }));
+        // Create child / ungrouped services with sequential display_order
+        let childOrder = 0;
+        const serviceRows: any[] = [];
+        for (const grp of orderedGroups) {
+          if (grp.group) {
+            childOrder = parentOrderMap.get(grp.group)! + 1;
+          }
+          for (const s of grp.items) {
+            serviceRows.push({
+              name: s.name,
+              status: s.status,
+              status_page_id: page.id,
+              display_order: childOrder,
+              uptime: s.uptime ?? (s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0),
+              parent_id: s.group ? (parentMap.get(s.group) ?? null) : null,
+            });
+            childOrder++;
+          }
+        }
+
         const { data: createdServices, error: sErr } = await supabase
           .from("services")
           .insert(serviceRows)
@@ -211,7 +245,9 @@ export function StatusPagePreview({
         // Save uptime_days for each service
         const uptimeRows: { service_id: string; day: string; up: boolean }[] = [];
         if (createdServices) {
-          allServices.forEach((s, i) => {
+          // Flatten services in the same order as serviceRows
+          const flatServices = orderedGroups.flatMap((grp) => grp.items);
+          flatServices.forEach((s, i) => {
             const serviceId = createdServices[i]?.id;
             if (!serviceId || !s.uptimeDays) return;
             const today = new Date();
