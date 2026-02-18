@@ -221,11 +221,13 @@ function extractGroupsFromHtml(html: string, serviceNames: string[]): Map<string
   // Step 1: Find all "N components" markers and extract the group name from nearby text.
   // Pattern: look for "N components" and scan backwards to find the group heading.
   const componentMarkerRegex = /(\d+)\s*components?/gi;
-  const groupEntries: { name: string; pos: number }[] = [];
+  const groupEntries: { name: string; pos: number; count: number }[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = componentMarkerRegex.exec(html)) !== null) {
     const markerPos = match.index;
+    const componentCount = parseInt(match[1], 10);
+    if (componentCount < 1 || componentCount > 200) continue;
     // Look backwards up to 500 chars to find a heading-like element
     const lookback = html.slice(Math.max(0, markerPos - 500), markerPos);
 
@@ -255,7 +257,7 @@ function extractGroupsFromHtml(html: string, serviceNames: string[]): Map<string
     if (groupName) {
       // Avoid duplicates
       if (!groupEntries.some(g => g.name === groupName)) {
-        groupEntries.push({ name: groupName, pos: markerPos });
+        groupEntries.push({ name: groupName, pos: markerPos, count: componentCount });
       }
     }
   }
@@ -281,17 +283,22 @@ function extractGroupsFromHtml(html: string, serviceNames: string[]): Map<string
     }
   }
 
-  // For each group, find services that appear after it and before the next group
+  // For each group, find services that appear after it and before the next group,
+  // but LIMIT to the count specified in "N components" to avoid sweeping standalone services
   for (let gi = 0; gi < groupEntries.length; gi++) {
     const groupStart = groupEntries[gi].pos;
     const groupEnd = gi + 1 < groupEntries.length ? groupEntries[gi + 1].pos : html.length;
     const groupName = groupEntries[gi].name;
+    const maxCount = groupEntries[gi].count;
 
-    for (const sp of servicePositions) {
-      // Service must appear after the group marker and before the next group
-      if (sp.pos > groupStart && sp.pos < groupEnd) {
-        result.set(sp.name, groupName);
-      }
+    // Collect candidate services in this range, sorted by position
+    const candidates = servicePositions
+      .filter(sp => sp.pos > groupStart && sp.pos < groupEnd)
+      .sort((a, b) => a.pos - b.pos);
+
+    // Only assign the first N services (matching the "N components" count)
+    for (let i = 0; i < Math.min(candidates.length, maxCount); i++) {
+      result.set(candidates[i].name, groupName);
     }
   }
 
