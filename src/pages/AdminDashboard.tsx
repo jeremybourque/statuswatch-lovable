@@ -1,6 +1,6 @@
 import { useStatusPages, type StatusPage } from "@/hooks/useStatusData";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Server, Globe, AlertTriangle } from "lucide-react";
+import { Activity, Plus, Loader2, Trash2, ArrowLeft, Pencil, Server, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -120,12 +120,6 @@ const AdminDashboard = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Status Pages</h2>
           <div className="flex items-center gap-2">
-            <Link to="/admin/clone">
-              <Button size="sm" variant="outline">
-                <Globe className="h-4 w-4 mr-1" />
-                Clone from URL
-              </Button>
-            </Link>
             <Link to="/admin/new?from=admin">
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
