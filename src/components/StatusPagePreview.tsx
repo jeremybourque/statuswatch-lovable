@@ -96,32 +96,36 @@ function CollapsibleGroup({
   groupStatus,
   items,
   renderServiceRow,
+  onGroupNameChange,
 }: {
   groupName: string;
   groupStatus: ServiceStatus;
   items: { service: PreviewService; originalIndex: number }[];
   renderServiceRow: (item: { service: PreviewService; originalIndex: number }) => React.ReactNode;
+  onGroupNameChange?: (newName: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <div>
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between mb-2 group cursor-pointer"
-      >
+      <div className="w-full flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <StatusDot status={groupStatus} />
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {groupName}
-          </h3>
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 cursor-pointer">
+            <StatusDot status={groupStatus} />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`}
+            />
+          </button>
+          <input
+            type="text"
+            value={groupName}
+            onChange={(e) => onGroupNameChange?.(e.target.value)}
+            className="text-sm font-semibold text-muted-foreground uppercase tracking-wide bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
           />
         </div>
         <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
           {statusConfig[groupStatus].label}
         </span>
-      </button>
+      </div>
       {!collapsed && (
         <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
           {items.map(renderServiceRow)}
@@ -494,6 +498,13 @@ export function StatusPagePreview({
                       groupStatus={groupStatus}
                       items={grp.items}
                       renderServiceRow={renderServiceRow}
+                      onGroupNameChange={(newName) => {
+                        setServices((prev) =>
+                          prev.map((s) =>
+                            s.group === grp.group ? { ...s, group: newName } : s
+                          )
+                        );
+                      }}
                     />
                   );
                 }
