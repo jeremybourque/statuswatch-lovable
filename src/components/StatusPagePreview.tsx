@@ -259,7 +259,7 @@ export function StatusPagePreview({
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Affected Services</h3>
         {services.length > 0 && (
-          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+          <div className="border border-border rounded-lg divide-y divide-border">
             {services.map((service, i) => (
               <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
                 <div className="flex items-center justify-between">
