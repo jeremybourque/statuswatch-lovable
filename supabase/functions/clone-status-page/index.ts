@@ -866,26 +866,30 @@ CRITICAL RULES:
   }
 
   const sinceMatch = rawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-  const startDate = sinceMatch ? sinceMatch[1] : null;
+  let startDate: string | null = sinceMatch ? sinceMatch[1] : null;
   progress(startDate ? `Chart date anchor: ${startDate}` : "No chart date anchor found");
 
-  progress("Using Firecrawl for uptime bar HTML...");
-  const uptimeRawHtml = await fetchRenderedHTMLForUptime(url, progress);
-  const uptimeHtml = stripForUptime(uptimeRawHtml);
-  console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
-
-  // Try to find date anchor in the rendered HTML
-  const sinceMatch2 = uptimeRawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
-  const startDate2 = sinceMatch2 ? sinceMatch2[1] : startDate;
-
   const serviceNames = flatServices.map((s) => s.name);
+  let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }> = new Map();
+  try {
+    progress("Using Firecrawl for uptime bar HTML...");
+    const uptimeRawHtml = await fetchRenderedHTMLForUptime(url, progress);
+    const uptimeHtml = stripForUptime(uptimeRawHtml);
+    console.log("Pass 2 (uptime) stripped HTML length:", uptimeHtml.length);
 
-  let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>;
-  if (startDate2) {
-    progress("Date anchor found — using deterministic SVG rect parsing...");
-    uptimeMap = parseSvgDeterministic(uptimeHtml, serviceNames, progress);
-  } else {
-    uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
+    // Try to find date anchor in the rendered HTML
+    const sinceMatch2 = uptimeRawHtml.match(/since-value="(\d{4}-\d{2}-\d{2})/);
+    startDate = sinceMatch2 ? sinceMatch2[1] : startDate;
+
+    if (startDate) {
+      progress("Date anchor found — using deterministic SVG rect parsing...");
+      uptimeMap = parseSvgDeterministic(uptimeHtml, serviceNames, progress);
+    } else {
+      uptimeMap = await extractUptimeSingle(apiKey, serviceNames, uptimeHtml, progress);
+    }
+  } catch (e: any) {
+    progress(`Could not extract uptime data: ${e.message}. Proceeding without uptime bars.`);
+    console.log("Uptime extraction error:", e.message);
   }
 
   const mergedServices: ExtractedService[] = flatServices.map((s) => {
@@ -915,7 +919,7 @@ CRITICAL RULES:
     progress(`Could not extract incidents: ${e.message}`);
   }
 
-  return { name: pass1.name, services: mergedServices, incidents, start_date: startDate2 };
+  return { name: pass1.name, services: mergedServices, incidents, start_date: startDate };
 }
 
 Deno.serve(async (req) => {
