@@ -350,9 +350,9 @@ export function StatusPagePreview({
                     </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 ml-6">
                   <TooltipProvider>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <UptimeBar days={(() => {
                         const raw = service.uptimeDays ?? [];
                         if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
@@ -360,7 +360,7 @@ export function StatusPagePreview({
                       })()} />
                     </div>
                   </TooltipProvider>
-                  <span className="w-16 text-right font-mono text-sm text-muted-foreground shrink-0">
+                  <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
                     {(service.uptime ?? 100).toFixed(2)}%
                   </span>
                 </div>
