@@ -91,6 +91,10 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
 
   const handleAnalyze = async () => {
     if (!text.trim()) return;
+    if (analyzed) {
+      const confirmed = window.confirm("This will clear the current preview. Continue?");
+      if (!confirmed) return;
+    }
     setAnalyzing(true);
     setAnalyzed(null);
     setAdditionalIncidents([]);
