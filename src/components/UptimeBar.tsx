@@ -24,14 +24,14 @@ export function UptimeBar({ days, startDate }: UptimeBarProps) {
     : addLocalDays(new Date(), -(days.length - 1));
 
   return (
-    <div className="flex gap-[2px] items-end">
+    <div className="flex gap-[2px] items-end w-full min-w-0">
       {days.map((up, i) => {
         const date = addLocalDays(anchorDate, i);
         return (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
               <div
-                className={`flex-1 min-w-[4px] h-6 rounded-sm transition-colors ${
+                className={`flex-1 min-w-0 h-6 rounded-sm transition-colors ${
                   up === null ? "bg-muted-foreground/20" : up ? "bg-status-operational" : "bg-status-major"
                 } hover:opacity-80`}
               />
