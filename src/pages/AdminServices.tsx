@@ -156,7 +156,7 @@ function PageDetailsSection({
     queryClient.invalidateQueries({ queryKey: ["status-page"] });
     queryClient.invalidateQueries({ queryKey: ["status-pages"] });
     if (newSlug !== page.slug) {
-      navigate(`/admin/${newSlug}/services`, { replace: true });
+      navigate(`/${newSlug}/edit`, { replace: true });
     }
   };
 
