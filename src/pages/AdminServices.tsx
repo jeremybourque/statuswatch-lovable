@@ -818,7 +818,7 @@ const AdminServices = () => {
           <Tabs defaultValue={defaultTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="details">Page Details</TabsTrigger>
-              <TabsTrigger value="services">Services ({services.length})</TabsTrigger>
+              <TabsTrigger value="services">Services ({services.filter(s => s.status !== "operational").length}/{services.length})</TabsTrigger>
               <TabsTrigger value="incidents">Incidents ({incidents.filter(i => i.status !== "resolved").length})</TabsTrigger>
             </TabsList>
 
