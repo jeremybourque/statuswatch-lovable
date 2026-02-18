@@ -500,7 +500,7 @@ export function StatusPagePreview({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 mr-8"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 mr-6"
                           onClick={() => {
                             updateIncident(incIndex, (prev) => {
                               const updates = prev.updates.filter((_, idx) => idx !== i);
