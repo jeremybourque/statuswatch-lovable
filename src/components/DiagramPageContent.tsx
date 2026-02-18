@@ -100,10 +100,6 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
 
   const handleAnalyze = async () => {
     if (!imageBase64 && !imageUrl.trim()) return;
-    if (previewData) {
-      const confirmed = window.confirm("This will clear the current preview. Continue?");
-      if (!confirmed) return;
-    }
     setAnalyzing(true);
     setPreviewData(null);
     setCollapsed(false);
