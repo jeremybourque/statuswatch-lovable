@@ -108,7 +108,7 @@ function CollapsibleGroup({
   return (
     <div>
       <div className="w-full flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 cursor-pointer">
             <StatusDot status={groupStatus} />
             <ChevronDown
