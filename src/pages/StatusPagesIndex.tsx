@@ -1,12 +1,12 @@
 import { useStatusPages } from "@/hooks/useStatusData";
 import { statusConfig } from "@/lib/statusData";
-import { Activity, Loader2, ArrowUpRight, Settings, Plus } from "lucide-react";
+import { Activity, Loader2, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { ServiceStatus } from "@/lib/statusData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
+
 import { useRef, useState, useEffect, useMemo, type ReactNode } from "react";
 
 function useColumnCount(containerRef: React.RefObject<HTMLElement | null>, columnWidth: number, gap: number) {
@@ -213,20 +213,6 @@ const StatusPagesIndex = () => {
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">StatusWatch</h1>
-          <div className="ml-auto flex items-center gap-2">
-            <Link to="/admin/new">
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                New Page
-              </Button>
-            </Link>
-            <Link to="/admin">
-              <Button variant="ghost" size="sm">
-                <Settings className="h-4 w-4 mr-1" />
-                Admin
-              </Button>
-            </Link>
-          </div>
         </div>
       </header>
 
