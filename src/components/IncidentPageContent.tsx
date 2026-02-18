@@ -116,7 +116,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       <section
         className={`border rounded-xl p-6 transition-colors duration-300 ${
           collapsed
-            ? "border-input bg-background cursor-pointer"
+            ? "border-border/50 bg-accent/50 cursor-pointer"
             : "border-border bg-card"
         }`}
       >
@@ -125,7 +125,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
           onClick={previewData ? () => setCollapsed(!collapsed) : undefined}
         >
           <h2 className={`text-lg font-semibold flex items-center gap-2 transition-colors duration-300 ${
-            collapsed ? "text-foreground" : "text-card-foreground"
+            collapsed ? "text-muted-foreground" : "text-card-foreground"
           }`}>
             <PenLine className="h-5 w-5" />
             Describe the Incident
