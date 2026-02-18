@@ -1,6 +1,6 @@
 import { useStatusPages } from "@/hooks/useStatusData";
 import { statusConfig } from "@/lib/statusData";
-import { Activity, Loader2, ArrowUpRight, Settings, Plus } from "lucide-react";
+import { Activity, Loader2, ArrowUpRight, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -218,12 +218,6 @@ const StatusPagesIndex = () => {
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
                 New Page
-              </Button>
-            </Link>
-            <Link to="/admin">
-              <Button variant="ghost" size="sm">
-                <Settings className="h-4 w-4 mr-1" />
-                Admin
               </Button>
             </Link>
           </div>

@@ -498,7 +498,7 @@ const AdminClonePage = () => {
       }
 
       toast({ title: "Status page cloned!" });
-      navigate("/admin");
+      navigate("/");
     } catch (err: any) {
       toast({
         title: "Failed to create",
@@ -518,7 +518,7 @@ const AdminClonePage = () => {
         <div className="max-w-5xl mx-auto px-4 py-6 flex items-center gap-3">
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">Clone Status Page</h1>
-          <Link to="/admin" className="ml-auto">
+          <Link to="/" className="ml-auto">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
@@ -789,7 +789,7 @@ export function ClonePageContent() {
       }
 
       toast({ title: "Status page cloned!" });
-      navigate("/admin");
+      navigate("/");
     } catch (err: any) {
       toast({
         title: "Failed to create",
