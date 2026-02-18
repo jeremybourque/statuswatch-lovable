@@ -137,10 +137,12 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
       if (!result.success || !result.data) throw new Error("No data returned");
 
       const data = result.data;
-      const services: PreviewService[] = (data.services || []).map((s: any) => ({
-        name: s.name,
-        status: s.status || "operational",
-      }));
+      const services: PreviewService[] = (data.services || [])
+        .filter((s: any) => s.name?.toLowerCase() !== "user")
+        .map((s: any) => ({
+          name: s.name,
+          status: s.status || "operational",
+        }));
 
       const org = data.organization?.trim();
       let pageName = org || "";
