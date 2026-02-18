@@ -58,18 +58,21 @@ You MUST use the extract_services tool to return your analysis.`;
         });
       }
       mimeType = contentType.split(";")[0].trim();
-      // Gemini does not support SVG — reject early with a clear message
-      if (mimeType === "image/svg+xml") {
-        return new Response(JSON.stringify({ error: "SVG images are not supported. Please use a PNG, JPEG, or WebP image instead." }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const arrayBuf = await imgRes.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuf);
-      let binary = "";
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      finalBase64 = btoa(binary);
+
+      if (mimeType === "image/svg+xml") {
+        // SVGs are XML — send as text so Gemini can parse the markup directly
+        const svgText = new TextDecoder().decode(arrayBuf);
+        userContent.push({
+          type: "text",
+          text: `Here is the SVG diagram markup to analyze:\n\n${svgText}`,
+        });
+      } else {
+        const bytes = new Uint8Array(arrayBuf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        finalBase64 = btoa(binary);
+      }
     }
 
     if (finalBase64) {
