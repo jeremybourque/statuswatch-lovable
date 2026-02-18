@@ -277,22 +277,10 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && imageUrl.trim()) {
-                      setImagePreview(imageUrl.trim());
-                    }
+                    if (e.key === "Enter" && imageUrl.trim()) handleAnalyze();
                   }}
                   className="flex-1"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (imageUrl.trim()) setImagePreview(imageUrl.trim());
-                  }}
-                  disabled={!imageUrl.trim()}
-                >
-                  Load
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
