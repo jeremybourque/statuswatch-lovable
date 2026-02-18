@@ -462,8 +462,9 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                     size="sm"
                     onClick={() => {
                       updateIncident(incIndex, (prev) => {
+                        const latestStatus = prev.updates.length > 0 ? prev.updates[0].status : "investigating";
                         const newUpdate: AnalyzedUpdate = {
-                          status: "investigating",
+                          status: latestStatus,
                           message: "New update...",
                           timestamp: new Date().toISOString(),
                         };
