@@ -108,6 +108,33 @@ export type Database = {
         }
         Relationships: []
       }
+      resources: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          name: string
+          type: string
+          url: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          type: string
+          url?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       services: {
         Row: {
           created_at: string
