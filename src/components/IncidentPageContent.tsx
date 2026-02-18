@@ -146,7 +146,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
               placeholder={"Paste your incident status updates here, or describe what's happening...\n\nExample:\n\"Our API is experiencing elevated error rates. Database connections are timing out. The web dashboard is loading slowly. We identified the issue as a failed database migration and are rolling it back.\""}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="min-h-[160px] font-mono text-sm"
+              className="min-h-[160px] font-mono text-sm ring-offset-card"
               disabled={analyzing}
             />
             <div className="flex items-center justify-between gap-3">
