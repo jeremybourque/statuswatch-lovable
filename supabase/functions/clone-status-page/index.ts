@@ -383,6 +383,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
         status: mapIncidentStatus(inc.status),
         impact: mapIncidentImpact(inc.impact),
         created_at: inc.created_at,
+        detail_url: inc.shortlink || null,
         updates,
       });
     }
@@ -394,18 +395,17 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   // Sort newest first
   allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // For incidents with empty update messages, fetch individual incident details
+  // For incidents with empty update messages, scrape the incident HTML pages (limit to 10 to avoid timeout)
   const incidentsNeedingDetail = allIncidents.filter(
-    (inc, i) => inc.updates.some(u => !u.message.trim()) && i < 25
+    (inc, i) => inc.updates.some(u => !u.message.trim()) && i < 10
   );
 
   if (incidentsNeedingDetail.length > 0) {
     progress(`Fetching details for ${incidentsNeedingDetail.length} incidents with missing update content...`);
     
-    // Find the API IDs that correspond to these incidents
+    // Build incident page URLs using the API IDs
     const idByTitle = new Map<string, string>();
     const allIds = [...seenIds];
-    // Re-map: we stored them in order, match by index
     let idx = 0;
     for (const inc of allIncidents) {
       if (idx < allIds.length) {
@@ -414,6 +414,8 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
       idx++;
     }
 
+    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+
     // Process in batches of 5
     for (let i = 0; i < incidentsNeedingDetail.length; i += 5) {
       const batch = incidentsNeedingDetail.slice(i, i + 5);
@@ -421,28 +423,108 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
         batch.map(async (inc) => {
           const apiId = idByTitle.get(inc.title);
           if (!apiId) return;
+          
+          // Try scraping the incident page for update content
+          const incidentUrl = `${origin}/incidents/${apiId}`;
           try {
-            const detailRes = await fetch(`${origin}/api/v2/incidents/${apiId}.json`, {
-              headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
-            });
-            if (!detailRes.ok) return;
-            const detailData = await detailRes.json();
-            const detailInc = detailData?.incident;
-            if (!detailInc?.incident_updates?.length) return;
+            let markdown = "";
             
-            const detailUpdates: ExtractedIncidentUpdate[] = detailInc.incident_updates.map((u: any) => ({
-              status: mapIncidentStatus(u.status),
-              message: u.body || "",
-              timestamp: u.created_at || u.updated_at || detailInc.created_at,
-            }));
+            if (firecrawlKey) {
+              // Use Firecrawl for JS-rendered pages
+              const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${firecrawlKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  url: incidentUrl,
+                  formats: ["markdown"],
+                  onlyMainContent: true,
+                }),
+              });
+              if (fcRes.ok) {
+                const fcData = await fcRes.json();
+                markdown = fcData?.data?.markdown || fcData?.markdown || "";
+              }
+            } else {
+              // Fallback: plain fetch
+              const htmlRes = await fetch(incidentUrl, {
+                headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" },
+              });
+              if (htmlRes.ok) {
+                markdown = await htmlRes.text();
+              }
+            }
             
-            // Only replace if we got better data
-            const hasContent = detailUpdates.some(u => u.message.trim().length > 0);
-            if (hasContent) {
-              inc.updates = detailUpdates;
+            if (!markdown) return;
+            
+            // Parse updates from markdown
+            // incident.io format: "Resolved\n\nMessage text\n\nTimestamp\n\nIdentified\n\nMessage text\n\nTimestamp"
+            const updateStatuses = ["resolved", "monitoring", "identified", "investigating", "update"];
+            const parsedUpdates: ExtractedIncidentUpdate[] = [];
+            
+            // Find the "Updates" section
+            const updatesIdx = markdown.indexOf("Updates");
+            if (updatesIdx === -1) return;
+            const updatesSection = markdown.slice(updatesIdx);
+            
+            // Split by status headers - look for lines that are just a status word
+            const lines = updatesSection.split("\n");
+            let currentStatus = "";
+            let currentMessage: string[] = [];
+            let currentTimestamp = "";
+            
+            for (const line of lines) {
+              const trimmed = line.trim().toLowerCase();
+              const isStatusLine = updateStatuses.includes(trimmed);
+              
+              if (isStatusLine) {
+                // Save previous update if we have one
+                if (currentStatus && currentMessage.length > 0) {
+                  parsedUpdates.push({
+                    status: mapIncidentStatus(currentStatus),
+                    message: currentMessage.join("\n").trim(),
+                    timestamp: currentTimestamp || inc.created_at,
+                  });
+                }
+                currentStatus = trimmed;
+                currentMessage = [];
+                currentTimestamp = "";
+              } else if (currentStatus) {
+                // Try to detect timestamp lines (e.g., "Thu, Nov 20, 2025, 07:14 AM")
+                const isTimestamp = /\b\d{4}\b/.test(line) && /\b(AM|PM|ago)\b/i.test(line);
+                if (isTimestamp) {
+                  currentTimestamp = line.trim();
+                } else if (trimmed && !trimmed.startsWith("powered by") && !trimmed.startsWith("privacy") && trimmed !== "updates") {
+                  // Skip navigation/footer content
+                  if (!trimmed.includes("earlier)") || trimmed.length > 20) {
+                    currentMessage.push(line.trim());
+                  }
+                }
+              }
+            }
+            // Save last update
+            if (currentStatus && currentMessage.length > 0) {
+              parsedUpdates.push({
+                status: mapIncidentStatus(currentStatus),
+                message: currentMessage.join("\n").trim(),
+                timestamp: currentTimestamp || inc.created_at,
+              });
+            }
+            
+            if (parsedUpdates.length > 0) {
+              // Match timestamps from API updates to parsed updates
+              const apiUpdates = inc.updates;
+              for (let j = 0; j < parsedUpdates.length && j < apiUpdates.length; j++) {
+                parsedUpdates[j].timestamp = apiUpdates[j].timestamp;
+                parsedUpdates[j].status = apiUpdates[j].status;
+              }
+              inc.updates = parsedUpdates;
+              console.log(`Scraped ${parsedUpdates.length} updates for "${inc.title}"`);
             }
           } catch (e: any) {
-            console.warn(`Could not fetch detail for incident "${inc.title}":`, e.message);
+            console.warn(`Could not scrape incident "${inc.title}":`, e.message);
           }
         })
       );
