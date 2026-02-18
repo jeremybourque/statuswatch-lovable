@@ -124,9 +124,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
           className={`flex items-center justify-between ${previewData ? "cursor-pointer" : ""}`}
           onClick={previewData ? () => setCollapsed(!collapsed) : undefined}
         >
-          <h2 className={`text-lg font-semibold flex items-center gap-2 transition-colors duration-300 ${
-            collapsed ? "text-muted-foreground" : "text-card-foreground"
-          }`}>
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-card-foreground transition-colors duration-300">
             <PenLine className="h-5 w-5" />
             Describe the Incident
           </h2>
