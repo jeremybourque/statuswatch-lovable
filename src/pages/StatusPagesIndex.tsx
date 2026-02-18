@@ -186,7 +186,7 @@ function BalancedStatusGrid({
     // Service dots wrap at 12 columns, so height ≈ ceil(count/12) rows of dots + base
     const weight = (p: (typeof pages)[0]) => {
       const count = serviceCounts[p.id] ?? 0;
-      return Math.ceil(count / 12) + 4;
+      return Math.ceil(count / 12) + 6;
     };
     return balanceColumns(pages, cols, weight);
   }, [pages, cols, serviceCounts]);
