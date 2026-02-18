@@ -112,6 +112,7 @@ export type Database = {
         Row: {
           content: string | null
           created_at: string
+          favicon_url: string | null
           id: string
           name: string
           type: string
@@ -120,6 +121,7 @@ export type Database = {
         Insert: {
           content?: string | null
           created_at?: string
+          favicon_url?: string | null
           id?: string
           name: string
           type: string
@@ -128,6 +130,7 @@ export type Database = {
         Update: {
           content?: string | null
           created_at?: string
+          favicon_url?: string | null
           id?: string
           name?: string
           type?: string
