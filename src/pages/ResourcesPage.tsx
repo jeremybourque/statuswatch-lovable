@@ -12,21 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Activity, Plus, Pencil, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
+import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -41,11 +32,13 @@ interface Resource {
   created_at: string;
 }
 
-const typeLabels: Record<ResourceType, string> = {
-  status_page: "Status Page",
-  system_diagram: "System Diagram",
-  incident_description: "Incident Description",
+const sectionConfig: Record<ResourceType, { label: string; icon: typeof Globe; description: string }> = {
+  status_page: { label: "Status Pages", icon: Globe, description: "Clone existing status pages into new projects" },
+  system_diagram: { label: "System Diagrams", icon: Network, description: "Analyze architecture diagrams for status page generation" },
+  incident_description: { label: "Incident Descriptions", icon: FileText, description: "Pre-written incident texts for quick analysis" },
 };
+
+const typeOrder: ResourceType[] = ["status_page", "system_diagram", "incident_description"];
 
 function ResourceForm({
   initial,
@@ -113,11 +106,47 @@ function ResourceForm({
   );
 }
 
+function ResourceCard({ resource, navigate }: { resource: Resource; navigate: ReturnType<typeof useNavigate> }) {
+  const launchAction = () => {
+    if (resource.type === "status_page" && resource.url) {
+      navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(resource.url)}`);
+    } else if (resource.type === "system_diagram" && resource.url) {
+      navigate(`/new?choice=diagram&diagramUrl=${encodeURIComponent(resource.url)}`);
+    } else if (resource.type === "incident_description" && resource.content) {
+      sessionStorage.setItem("preloadIncidentDescription", resource.content);
+      navigate(`/new?choice=incident`);
+    }
+  };
+
+  const subtitle = resource.type === "incident_description"
+    ? (resource.content?.slice(0, 120) + (resource.content && resource.content.length > 120 ? "…" : ""))
+    : resource.url;
+
+  const actionLabel = resource.type === "status_page" ? "Clone" : resource.type === "system_diagram" ? "Analyze" : "Analyze";
+
+  return (
+    <div className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/20 hover:bg-accent/50">
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-foreground text-sm">{resource.name}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+        onClick={launchAction}
+      >
+        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+        {actionLabel}
+      </Button>
+    </div>
+  );
+}
+
 const ResourcesPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Resource | undefined>();
 
   const { data: resources = [], isLoading } = useQuery({
     queryKey: ["resources"],
@@ -132,153 +161,94 @@ const ResourcesPage = () => {
   });
 
   const upsert = useMutation({
-    mutationFn: async (vals: { id?: string; type: ResourceType; name: string; url: string; content: string }) => {
+    mutationFn: async (vals: { type: ResourceType; name: string; url: string; content: string }) => {
       const row = {
         type: vals.type,
         name: vals.name,
         url: vals.type === "incident_description" ? null : vals.url,
         content: vals.type === "incident_description" ? vals.content : null,
       };
-      if (vals.id) {
-        const { error } = await supabase.from("resources").update(row).eq("id", vals.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("resources").insert(row);
-        if (error) throw error;
-      }
+      const { error } = await supabase.from("resources").insert(row);
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["resources"] });
       setDialogOpen(false);
-      setEditing(undefined);
       toast.success("Resource saved");
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("resources").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["resources"] });
-      toast.success("Resource deleted");
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const grouped = typeOrder.reduce((acc, type) => {
+    acc[type] = resources.filter((r) => r.type === type);
+    return acc;
+  }, {} as Record<ResourceType, Resource[]>);
 
-  const openCreate = () => {
-    setEditing(undefined);
-    setDialogOpen(true);
-  };
-
-  const openEdit = (r: Resource) => {
-    setEditing(r);
-    setDialogOpen(true);
-  };
+  const nonEmptySections = typeOrder.filter((t) => grouped[t].length > 0);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex items-center gap-3">
+        <div className="max-w-3xl mx-auto px-4 py-6 flex items-center gap-3">
           <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <Activity className="h-7 w-7 text-primary" />
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Resources</h1>
+          <div>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">Resources</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Saved references for quick-launch workflows</p>
+          </div>
           <div className="ml-auto">
-            <Button size="sm" onClick={openCreate}>
+            <Button size="sm" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
-              Add Resource
+              Add
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
         {isLoading ? (
           <p className="text-muted-foreground text-sm">Loading…</p>
         ) : resources.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No resources yet.</p>
-        ) : (
-          <div className="border border-border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead className="w-24" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resources.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {typeLabels[r.type]}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                      {r.type === "incident_description" ? r.content : r.url}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        {r.type === "status_page" && r.url && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Clone this status page"
-                            onClick={() => navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(r.url!)}`)}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {r.type === "system_diagram" && r.url && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Use in diagram analyzer"
-                            onClick={() => navigate(`/new?choice=diagram&diagramUrl=${encodeURIComponent(r.url!)}`)}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {r.type === "incident_description" && r.content && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Use in incident analyzer"
-                            onClick={() => {
-                              sessionStorage.setItem("preloadIncidentDescription", r.content!);
-                              navigate(`/new?choice=incident`);
-                            }}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="text-center py-16">
+            <Activity className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">No resources yet. Add one to get started.</p>
           </div>
+        ) : (
+          nonEmptySections.map((type) => {
+            const config = sectionConfig[type];
+            const Icon = config.icon;
+            return (
+              <section key={type}>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10">
+                    <Icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">{config.label}</h2>
+                    <p className="text-xs text-muted-foreground">{config.description}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {grouped[type].map((r) => (
+                    <ResourceCard key={r.id} resource={r} navigate={navigate} />
+                  ))}
+                </div>
+              </section>
+            );
+          })
         )}
       </main>
 
-      <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditing(undefined); }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Resource" : "New Resource"}</DialogTitle>
+            <DialogTitle>New Resource</DialogTitle>
           </DialogHeader>
           <ResourceForm
-            initial={editing}
             onCancel={() => setDialogOpen(false)}
-            onSubmit={(vals) => upsert.mutate({ ...vals, id: editing?.id })}
+            onSubmit={(vals) => upsert.mutate(vals)}
           />
         </DialogContent>
       </Dialog>
