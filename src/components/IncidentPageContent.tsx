@@ -119,9 +119,11 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
             ? "border-border/50 bg-accent/50 cursor-pointer"
             : "border-border bg-card"
         }`}
-        onClick={collapsed ? () => setCollapsed(false) : undefined}
       >
-        <div className="flex items-center justify-between">
+        <div
+          className={`flex items-center justify-between ${previewData ? "cursor-pointer" : ""}`}
+          onClick={previewData ? () => setCollapsed(!collapsed) : undefined}
+        >
           <h2 className={`text-lg font-semibold flex items-center gap-2 transition-colors duration-300 ${
             collapsed ? "text-muted-foreground" : "text-card-foreground"
           }`}>
