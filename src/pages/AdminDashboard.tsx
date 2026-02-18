@@ -120,7 +120,7 @@ const AdminDashboard = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Status Pages</h2>
           <div className="flex items-center gap-2">
-            <Link to="/admin/new?from=admin">
+            <Link to="/new?from=admin">
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
                 Add Page
