@@ -20,6 +20,7 @@ export interface PreviewService {
   status: ServiceStatus;
   uptimeDays?: (boolean | null)[];
   uptime?: number;
+  group?: string | null;
 }
 
 export interface PreviewUpdate {
@@ -171,12 +172,35 @@ export function StatusPagePreview({
         ...incidents.flatMap((inc) => inc.services),
       ];
       if (allServices.length > 0) {
+        // Determine unique groups
+        const groupNames = [...new Set(allServices.map((s) => s.group).filter(Boolean))] as string[];
+
+        // Create parent services for groups
+        const parentMap = new Map<string, string>();
+        if (groupNames.length > 0) {
+          const parentRows = groupNames.map((g, i) => ({
+            name: g,
+            status: "operational",
+            status_page_id: page.id,
+            display_order: i,
+            uptime: 100,
+          }));
+          const { data: createdParents, error: pErr } = await supabase
+            .from("services")
+            .insert(parentRows)
+            .select("id, name");
+          if (pErr) throw pErr;
+          createdParents?.forEach((p) => parentMap.set(p.name, p.id));
+        }
+
+        // Create child / ungrouped services
         const serviceRows = allServices.map((s, i) => ({
           name: s.name,
           status: s.status,
           status_page_id: page.id,
-          display_order: i,
+          display_order: groupNames.length + i,
           uptime: s.uptime ?? (s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0),
+          parent_id: s.group ? (parentMap.get(s.group) ?? null) : null,
         }));
         const { data: createdServices, error: sErr } = await supabase
           .from("services")
@@ -192,7 +216,6 @@ export function StatusPagePreview({
             if (!serviceId || !s.uptimeDays) return;
             const today = new Date();
             const days = s.uptimeDays;
-            // uptimeDays is ordered oldest→newest, padded to 90 days
             days.forEach((up, dayIdx) => {
               if (up === null || up === undefined) return;
               const daysAgo = days.length - 1 - dayIdx;
@@ -290,84 +313,133 @@ export function StatusPagePreview({
       {/* Services */}
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
-        {services.length > 0 && (
-          <div className="border border-border rounded-lg divide-y divide-border">
-            {services.map((service, i) => (
-              <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                    <StatusDot status={service.status} />
-                    <input
-                      type="text"
-                      value={service.name}
-                      onChange={(e) => {
-                        setServices((prev) => {
-                          const updated = [...prev];
-                          updated[i] = { ...updated[i], name: e.target.value };
-                          return updated;
-                        });
-                      }}
-                      className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Select
-                      value={service.status}
-                      onValueChange={(val) => {
-                        setServices((prev) => {
-                          const updated = [...prev];
-                          updated[i] = { ...updated[i], status: val as ServiceStatus };
-                          return updated;
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
-                            {statusConfig[service.status]?.label}
-                          </span>
+        {services.length > 0 && (() => {
+          // Group services: grouped ones under their group header, ungrouped standalone
+          const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
+          services.forEach((service, i) => {
+            const g = service.group || null;
+            const existing = groups.find((gr) => gr.group === g);
+            if (existing) {
+              existing.items.push({ service, originalIndex: i });
+            } else {
+              groups.push({ group: g, items: [{ service, originalIndex: i }] });
+            }
+          });
+
+          return (
+            <div className="space-y-6">
+              {groups.map((grp, gIdx) => {
+                const groupServices = grp.items.map((item) => item.service);
+                const groupStatus = getOverallStatus(groupServices);
+
+                const renderServiceRow = (item: { service: PreviewService; originalIndex: number }) => {
+                  const { service, originalIndex: i } = item;
+                  return (
+                    <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                          <StatusDot status={service.status} />
+                          <input
+                            type="text"
+                            value={service.name}
+                            onChange={(e) => {
+                              setServices((prev) => {
+                                const updated = [...prev];
+                                updated[i] = { ...updated[i], name: e.target.value };
+                                return updated;
+                              });
+                            }}
+                            className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                          />
                         </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            <div className="flex items-center gap-2">
-                              <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => {
-                        setServices((prev) => prev.filter((_, idx) => idx !== i));
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 ml-6">
-                  <TooltipProvider>
-                    <div className="flex-1 min-w-0">
-                      <UptimeBar days={(() => {
-                        const raw = service.uptimeDays ?? [];
-                        if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
-                        return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
-                      })()} />
+                        <div className="flex items-center gap-1">
+                          <Select
+                            value={service.status}
+                            onValueChange={(val) => {
+                              setServices((prev) => {
+                                const updated = [...prev];
+                                updated[i] = { ...updated[i], status: val as ServiceStatus };
+                                return updated;
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                                  {statusConfig[service.status]?.label}
+                                </span>
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                            onClick={() => {
+                              setServices((prev) => prev.filter((_, idx) => idx !== i));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-6">
+                        <TooltipProvider>
+                          <div className="flex-1 min-w-0">
+                            <UptimeBar days={(() => {
+                              const raw = service.uptimeDays ?? [];
+                              if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
+                              return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
+                            })()} />
+                          </div>
+                        </TooltipProvider>
+                        <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
+                          {(service.uptime ?? 100).toFixed(2)}%
+                        </span>
+                      </div>
                     </div>
-                  </TooltipProvider>
-                  <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
-                    {(service.uptime ?? 100).toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                  );
+                };
+
+                if (grp.group) {
+                  return (
+                    <div key={`group-${gIdx}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <StatusDot status={groupStatus} />
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            {grp.group}
+                          </h3>
+                        </div>
+                        <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
+                          {statusConfig[groupStatus].label}
+                        </span>
+                      </div>
+                      <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
+                        {grp.items.map(renderServiceRow)}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={`group-${gIdx}`} className="border border-border rounded-lg divide-y divide-border overflow-hidden">
+                    {grp.items.map(renderServiceRow)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
         <Button
           variant="outline"
           size="sm"
