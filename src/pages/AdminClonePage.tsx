@@ -208,6 +208,7 @@ export function ClonePageContent({ initialUrl }: { initialUrl?: string } = {}) {
     status: s.status,
     uptimeDays: s.uptime_days ?? undefined,
     uptime: s.uptime_pct ?? undefined,
+    group: s.group ?? undefined,
   })) ?? [];
 
   const previewIncidents: PreviewIncident[] = extracted?.incidents?.map((inc) => ({
