@@ -176,9 +176,9 @@ export function StatusPagePreview({
         const orderedGroups: { group: string | null; items: PreviewService[] }[] = [];
         for (const s of allServices) {
           const g = s.group || null;
-          const existing = orderedGroups.find((gr) => gr.group === g);
-          if (existing) {
-            existing.items.push(s);
+          const last = orderedGroups.length > 0 ? orderedGroups[orderedGroups.length - 1] : null;
+          if (last && last.group === g) {
+            last.items.push(s);
           } else {
             orderedGroups.push({ group: g, items: [s] });
           }
@@ -354,9 +354,9 @@ export function StatusPagePreview({
           const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
           services.forEach((service, i) => {
             const g = service.group || null;
-            const existing = groups.find((gr) => gr.group === g);
-            if (existing) {
-              existing.items.push({ service, originalIndex: i });
+            const last = groups.length > 0 ? groups[groups.length - 1] : null;
+            if (last && last.group === g) {
+              last.items.push({ service, originalIndex: i });
             } else {
               groups.push({ group: g, items: [{ service, originalIndex: i }] });
             }
