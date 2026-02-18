@@ -176,10 +176,37 @@ export function StatusPagePreview({
           status: s.status,
           status_page_id: page.id,
           display_order: i,
-          uptime: s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0,
+          uptime: s.uptime ?? (s.status === "operational" ? 99.99 : s.status === "degraded" ? 99.5 : 99.0),
         }));
-        const { error: sErr } = await supabase.from("services").insert(serviceRows);
+        const { data: createdServices, error: sErr } = await supabase
+          .from("services")
+          .insert(serviceRows)
+          .select("id");
         if (sErr) throw sErr;
+
+        // Save uptime_days for each service
+        const uptimeRows: { service_id: string; day: string; up: boolean }[] = [];
+        if (createdServices) {
+          allServices.forEach((s, i) => {
+            const serviceId = createdServices[i]?.id;
+            if (!serviceId || !s.uptimeDays) return;
+            const today = new Date();
+            const days = s.uptimeDays;
+            // uptimeDays is ordered oldest→newest, padded to 90 days
+            days.forEach((up, dayIdx) => {
+              if (up === null || up === undefined) return;
+              const daysAgo = days.length - 1 - dayIdx;
+              const d = new Date(today);
+              d.setDate(d.getDate() - daysAgo);
+              const dayStr = d.toISOString().slice(0, 10);
+              uptimeRows.push({ service_id: serviceId, day: dayStr, up });
+            });
+          });
+        }
+        if (uptimeRows.length > 0) {
+          const { error: udErr } = await supabase.from("uptime_days").insert(uptimeRows);
+          if (udErr) console.error("Failed to insert uptime_days:", udErr);
+        }
       }
 
       for (const inc of incidents) {
