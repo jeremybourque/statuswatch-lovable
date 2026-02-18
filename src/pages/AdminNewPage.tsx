@@ -122,12 +122,12 @@ const AdminNewPage = () => {
                 >
                   <Button
                     variant="outline"
-                    className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-colors duration-300 rounded-xl ${
+                    className={`w-full h-auto py-5 flex items-center gap-2 text-lg font-semibold justify-start px-6 whitespace-normal transition-colors duration-300 rounded-xl ${
                       isSelected ? "border-primary bg-accent" : ""
                     }`}
                     onClick={() => setSelected(isSelected ? null : choice.id)}
                   >
-                    <Icon className={`h-10 w-10 shrink-0 ${choice.iconClass}`} />
+                    <Icon className={`h-5 w-5 shrink-0 ${choice.iconClass}`} />
                     {choice.label}
                   </Button>
                 </div>
