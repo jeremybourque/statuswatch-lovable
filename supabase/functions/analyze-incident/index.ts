@@ -39,9 +39,12 @@ For each affected service, determine its current status based on the incident:
 
 If the text is vague about specific services, infer reasonable service names from context (e.g. "API", "Website", "Database", "Authentication", etc.).
 
+If no timestamps are mentioned or can be inferred from the text, use the current date and time provided below for all timestamps.
+
 You MUST use the extract_incident_data tool to return your analysis.`;
 
-    const userPrompt = `Analyze this incident report and extract the structured data:\n\n${text.slice(0, 10000)}`;
+    const now = new Date().toISOString();
+    const userPrompt = `Current date and time: ${now}\n\nAnalyze this incident report and extract the structured data:\n\n${text.slice(0, 10000)}`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
