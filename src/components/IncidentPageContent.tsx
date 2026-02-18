@@ -155,7 +155,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
               <p className="text-xs text-muted-foreground">
                 AI will identify affected services and create a status page preview.
               </p>
-              <Button onClick={(e) => { e.stopPropagation(); handleAnalyze(); }} disabled={analyzing || !text.trim()} className="shrink-0">
+              <Button onClick={(e) => { e.stopPropagation(); handleAnalyze(); }} disabled={analyzing || !text.trim()} className="shrink-0 rounded-xl">
                 {analyzing ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-1" />
                 ) : (
