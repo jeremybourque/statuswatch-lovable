@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,14 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBanner } from "@/components/StatusBanner";
+import { UptimeBar } from "@/components/UptimeBar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { statusConfig, type ServiceStatus } from "@/lib/statusData";
 import { format, parseISO } from "date-fns";
 
+const UPTIME_DAYS_COUNT = 90;
+
 export interface PreviewService {
   name: string;
   status: ServiceStatus;
+  uptimeDays?: (boolean | null)[];
+  uptime?: number;
 }
 
 export interface PreviewUpdate {
@@ -255,60 +261,72 @@ export function StatusPagePreview({
         {services.length > 0 && (
           <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
             {services.map((service, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors">
-                <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                  <StatusDot status={service.status} />
-                  <input
-                    type="text"
-                    value={service.name}
-                    onChange={(e) => {
-                      setServices((prev) => {
-                        const updated = [...prev];
-                        updated[i] = { ...updated[i], name: e.target.value };
-                        return updated;
-                      });
-                    }}
-                    className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-                  />
+              <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                    <StatusDot status={service.status} />
+                    <input
+                      type="text"
+                      value={service.name}
+                      onChange={(e) => {
+                        setServices((prev) => {
+                          const updated = [...prev];
+                          updated[i] = { ...updated[i], name: e.target.value };
+                          return updated;
+                        });
+                      }}
+                      className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Select
+                      value={service.status}
+                      onValueChange={(val) => {
+                        setServices((prev) => {
+                          const updated = [...prev];
+                          updated[i] = { ...updated[i], status: val as ServiceStatus };
+                          return updated;
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                            {statusConfig[service.status]?.label}
+                          </span>
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                          <SelectItem key={s} value={s}>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => {
+                        setServices((prev) => prev.filter((_, idx) => idx !== i));
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Select
-                    value={service.status}
-                    onValueChange={(val) => {
-                      setServices((prev) => {
-                        const updated = [...prev];
-                        updated[i] = { ...updated[i], status: val as ServiceStatus };
-                        return updated;
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
-                          {statusConfig[service.status]?.label}
-                        </span>
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                        <SelectItem key={s} value={s}>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => {
-                      setServices((prev) => prev.filter((_, idx) => idx !== i));
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <TooltipProvider>
+                    <div className="flex-1">
+                      <UptimeBar days={service.uptimeDays ?? Array(UPTIME_DAYS_COUNT).fill(null)} />
+                    </div>
+                  </TooltipProvider>
+                  <span className="w-16 text-right font-mono text-sm text-muted-foreground shrink-0">
+                    {(service.uptime ?? 100).toFixed(2)}%
+                  </span>
                 </div>
               </div>
             ))}
