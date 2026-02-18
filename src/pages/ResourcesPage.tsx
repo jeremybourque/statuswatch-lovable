@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink, RefreshCw } from "lucide-react";
+import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink, RefreshCw, Check } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -119,6 +119,9 @@ function getFaviconUrl(siteUrl: string, bustCache?: number): string | null {
 function ResourceCard({ resource, navigate }: { resource: Resource; navigate: ReturnType<typeof useNavigate> }) {
   const [faviconError, setFaviconError] = useState(false);
   const [cacheBust, setCacheBust] = useState<number | undefined>();
+  const [previewBust, setPreviewBust] = useState<number | undefined>();
+  const [showPreview, setShowPreview] = useState(false);
+
   const launchAction = () => {
     if (resource.type === "status_page" && resource.url) {
       navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(resource.url)}`);
@@ -136,36 +139,62 @@ function ResourceCard({ resource, navigate }: { resource: Resource; navigate: Re
 
   const actionLabel = resource.type === "status_page" ? "Clone" : "Analyze";
   const faviconUrl = resource.type === "status_page" && resource.url ? getFaviconUrl(resource.url, cacheBust) : null;
+  const previewUrl = resource.type === "status_page" && resource.url && previewBust ? getFaviconUrl(resource.url, previewBust) : null;
 
-  const refreshFavicon = () => {
+  const requestRefresh = () => {
+    setPreviewBust(Date.now());
+    setShowPreview(true);
+  };
+
+  const confirmRefresh = () => {
+    setCacheBust(previewBust);
     setFaviconError(false);
-    setCacheBust(Date.now());
+    setShowPreview(false);
+    setPreviewBust(undefined);
+  };
+
+  const cancelRefresh = () => {
+    setShowPreview(false);
+    setPreviewBust(undefined);
   };
 
   return (
-    <div className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/20 hover:bg-accent/50">
-      {faviconUrl && !faviconError ? (
-        <button onClick={refreshFavicon} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all" title="Refresh favicon">
-          <img src={faviconUrl} alt="" className="h-5 w-5 rounded" />
-        </button>
-      ) : resource.type === "status_page" ? (
-        <button onClick={refreshFavicon} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Refresh favicon">
-          <RefreshCw className="h-5 w-5" />
-        </button>
-      ) : null}
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground text-sm">{resource.name}</p>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
+    <div className="rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50">
+      <div className="group flex items-center gap-3 p-4">
+        {faviconUrl && !faviconError ? (
+          <button onClick={requestRefresh} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all" title="Refresh favicon">
+            <img src={faviconUrl} alt="" className="h-5 w-5 rounded" />
+          </button>
+        ) : resource.type === "status_page" ? (
+          <button onClick={requestRefresh} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Refresh favicon">
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        ) : null}
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground text-sm">{resource.name}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+          onClick={launchAction}
+        >
+          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+          {actionLabel}
+        </Button>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
-        onClick={launchAction}
-      >
-        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-        {actionLabel}
-      </Button>
+      {showPreview && previewUrl && (
+        <div className="border-t border-border px-4 py-3 flex items-center gap-3 bg-muted/30 rounded-b-xl">
+          <img src={previewUrl} alt="New favicon" className="h-8 w-8 rounded border border-border" />
+          <p className="text-xs text-muted-foreground flex-1">Use this favicon?</p>
+          <Button variant="outline" size="sm" onClick={cancelRefresh}>Cancel</Button>
+          <Button size="sm" onClick={confirmRefresh}>
+            <Check className="h-3.5 w-3.5 mr-1" />
+            Accept
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
