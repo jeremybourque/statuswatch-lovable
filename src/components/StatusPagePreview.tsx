@@ -289,7 +289,7 @@ export function StatusPagePreview({
 
       {/* Services */}
       <div className="space-y-3">
-        <h3 className="text-xl font-semibold text-foreground">Affected Services</h3>
+        <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (
           <div className="border border-border rounded-lg divide-y divide-border">
             {services.map((service, i) => (
