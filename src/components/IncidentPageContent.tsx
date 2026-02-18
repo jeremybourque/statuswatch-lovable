@@ -124,7 +124,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       // Auto-fill name/slug only if organization is mentioned
       const org = data.organization?.trim();
       if (org) {
-        const pageName = `${org} Status`;
+        const pageName = org;
         setName(pageName);
         if (!slugManual) {
           const baseSlug = slugify(pageName);
