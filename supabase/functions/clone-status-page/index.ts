@@ -352,7 +352,23 @@ function classifyFillColor(fill: string): boolean | null {
 
   return null;
 }
-
+// Classify uptime bar by CSS class name (e.g. incident.io uses UptimeChart_pillOperational__xxx)
+function classifyUptimeClass(className: string): boolean | null | undefined {
+  const cl = className.toLowerCase();
+  // Operational / up = green → true
+  if (/operational|success|up\b|healthy|available|active/.test(cl)) return true;
+  // Degraded / partial / warning → false
+  if (/degraded|partial|warning|impaired|limited/.test(cl)) return false;
+  // Major / outage / down / critical / error → false
+  if (/major|outage|down|critical|error|incident|disruption/.test(cl)) return false;
+  // Maintenance → false
+  if (/maintenance|scheduled/.test(cl)) return false;
+  // No data / empty / unknown → null
+  if (/nodata|no-data|empty|unknown|none|placeholder/.test(cl)) return null;
+  // If it contains "pill" or "bar" but no status keyword, it's likely a bar element — default to null
+  if (/pill|bar|uptime|chart/.test(cl)) return null;
+  return undefined; // unrecognized
+}
 function parseSvgDeterministic(
   html: string,
   serviceNames: string[],
@@ -372,10 +388,6 @@ function parseSvgDeterministic(
       continue;
     }
 
-    // Find the next <svg after this name
-    const svgStartIdx = html.indexOf('<svg', nameIdx);
-    if (svgStartIdx === -1) continue;
-
     // Bound the search: don't go past the next service name or too far
     let boundIdx = html.length;
     for (const other of serviceNames) {
@@ -384,12 +396,31 @@ function parseSvgDeterministic(
       if (otherIdx !== -1 && otherIdx < boundIdx) boundIdx = otherIdx;
     }
 
-    const svgEndIdx = html.indexOf('</svg>', svgStartIdx);
-    if (svgEndIdx === -1 || svgEndIdx > boundIdx + 500) continue;
+    // Find the next <svg after this name
+    // Skip small icon SVGs — find the SVG that contains <rect elements (the uptime chart)
+    let svgContent = '';
+    let svgSearchStart = nameIdx;
+    while (true) {
+      const svgStartIdx = html.indexOf('<svg', svgSearchStart);
+      if (svgStartIdx === -1 || svgStartIdx > boundIdx) break;
 
-    const svgContent = html.slice(svgStartIdx, svgEndIdx + 6);
+      const svgEndIdx = html.indexOf('</svg>', svgStartIdx);
+      if (svgEndIdx === -1 || svgEndIdx > boundIdx + 500) break;
 
-    // Extract all rect elements with fill colors
+      const candidate = html.slice(svgStartIdx, svgEndIdx + 6);
+      if (candidate.includes('<rect')) {
+        svgContent = candidate;
+        break;
+      }
+      svgSearchStart = svgEndIdx + 6;
+    }
+
+    if (!svgContent) {
+      console.log(`  Deterministic: no SVG with <rect> found after "${name}"`);
+      continue;
+    }
+
+    // Extract all rect elements with fill colors or CSS classes
     const rects: { color: boolean | null; x: number }[] = [];
     const rectRegex = /<rect[^>]*>/gi;
     let match;
@@ -408,10 +439,20 @@ function parseSvgDeterministic(
         const styleFill = rectStr.match(/style="[^"]*fill:\s*([^;"]+)/i);
         if (styleFill) fill = styleFill[1];
       }
-      if (!fill || fill === 'transparent' || fill === 'none') continue;
 
-      const classified = classifyFillColor(fill);
-      if (classified === undefined) continue; // skip transparent
+      let classified: boolean | null | undefined;
+
+      if (fill && fill !== 'transparent' && fill !== 'none') {
+        classified = classifyFillColor(fill);
+      } else {
+        // Try CSS class-based classification (e.g. incident.io uses UptimeChart_pillOperational__xxx)
+        const classAttr = rectStr.match(/class="([^"]+)"/i);
+        if (classAttr) {
+          classified = classifyUptimeClass(classAttr[1]);
+        }
+      }
+
+      if (classified === undefined) continue; // skip unclassifiable
 
       // Extract x position for ordering
       const xMatch = rectStr.match(/\bx="([^"]+)"/i);
