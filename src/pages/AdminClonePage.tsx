@@ -176,6 +176,7 @@ export function ClonePageContent({ initialUrl }: { initialUrl?: string } = {}) {
       const uniqueSlug = await findUniqueSlug(baseSlug);
       setPreviewName(result.name || "");
       setPreviewSlug(uniqueSlug);
+      setUrlCardExpanded(false);
       const incidentCount = result.incidents?.length ?? 0;
       toast({ title: "Page analyzed!", description: `Found ${result.services?.length ?? 0} services and ${incidentCount} incidents.` });
     } catch (err: any) {
