@@ -241,22 +241,27 @@ export function StatusPagePreview({
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
           placeholder="Page Name"
-          className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+          className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
         />
-        <div className="flex items-center shrink-0">
-          <span className="text-sm text-muted-foreground select-none">/</span>
+      </div>
+
+      <StatusBanner status={getOverallStatus(services)} />
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="preview-slug" className="text-xs text-muted-foreground">Slug:</Label>
           <input
+            id="preview-slug"
             type="text"
             value={slug}
             onChange={(e) => {
               setSlugManual(true);
               setSlug(slugify(e.target.value));
             }}
-            placeholder="slug"
-            className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors w-auto"
-            style={{ width: `${Math.max(slug.length, 4) + 1}ch` }}
+            className="text-xs text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
           />
         </div>
+        <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
       </div>
 
       {/* Services */}
