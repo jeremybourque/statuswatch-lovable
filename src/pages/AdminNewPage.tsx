@@ -122,7 +122,7 @@ const AdminNewPage = () => {
                 >
                   <Button
                     variant="outline"
-                    className={`w-full h-auto py-5 flex items-center gap-4 text-base font-medium justify-center px-6 whitespace-normal transition-colors duration-300 ${
+                    className={`w-full h-auto py-5 flex items-center gap-4 text-lg font-semibold justify-center px-6 whitespace-normal transition-colors duration-300 ${
                       isSelected ? "border-primary bg-accent" : ""
                     }`}
                     onClick={() => setSelected(isSelected ? null : choice.id)}
