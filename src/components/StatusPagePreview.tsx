@@ -498,11 +498,12 @@ export function StatusPagePreview({
                   );
                 }
 
-                return (
-                  <div key={`group-${gIdx}`} className="border border-border rounded-lg divide-y divide-border overflow-hidden">
-                    {grp.items.map(renderServiceRow)}
+                // Standalone services: each in its own card
+                return grp.items.map((item) => (
+                  <div key={`standalone-${item.originalIndex}`} className="border border-border rounded-lg overflow-hidden">
+                    {renderServiceRow(item)}
                   </div>
-                );
+                ));
               })}
             </div>
           );
