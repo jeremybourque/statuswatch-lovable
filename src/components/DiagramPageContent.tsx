@@ -230,9 +230,9 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors outline-none ${
-                  dragOver ? "border-primary bg-accent/50" : "border-border"
-                } focus:border-primary/60 focus:ring-2 focus:ring-primary/20`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors outline-none ring-0 ${
+                  dragOver ? "border-primary bg-accent/50" : "border-border focus:border-primary/60"
+                }`}
               >
                 <div className="flex flex-col items-center gap-3">
                   <Image className="h-10 w-10 text-muted-foreground" />
