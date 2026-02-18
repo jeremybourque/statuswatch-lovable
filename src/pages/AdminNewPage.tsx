@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ClonePageContent } from "@/pages/AdminClonePage";
 import { IncidentPageContent } from "@/components/IncidentPageContent";
 import { DiagramPageContent } from "@/components/DiagramPageContent";
+import { StatusPagePreview } from "@/components/StatusPagePreview";
 
 type Choice = "incident" | "clone" | "diagram" | "manual";
 
@@ -149,12 +150,14 @@ const AdminNewPage = () => {
             {selected === "clone" && <ClonePageContent />}
             {selected === "incident" && <IncidentPageContent navigateTo={backTo} />}
             {selected === "diagram" && <DiagramPageContent navigateTo={backTo} />}
-            {selected && selected !== "clone" && selected !== "incident" && selected !== "diagram" && (
-              <div className="border border-border rounded-lg p-8 bg-card">
-                <p className="text-muted-foreground text-center">
-                  This section is under construction. Coming soon!
-                </p>
-              </div>
+            {selected === "manual" && (
+              <StatusPagePreview
+                initialServices={[]}
+                initialIncidents={[]}
+                initialName=""
+                initialSlug=""
+                navigateTo={backTo}
+              />
             )}
           </div>
         </div>
