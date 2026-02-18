@@ -495,7 +495,14 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
                 // Try to detect timestamp lines (e.g., "Thu, Nov 20, 2025, 07:14 AM")
                 const isTimestamp = /\b\d{4}\b/.test(line) && /\b(AM|PM|ago)\b/i.test(line);
                 if (isTimestamp) {
-                  currentTimestamp = line.trim();
+                  // Clean raw timestamp: remove "(X minutes earlier)" suffix and try to parse
+                  let rawTs = line.trim().replace(/\s*\(.*?\)\s*$/, "");
+                  try {
+                    const parsed = new Date(rawTs);
+                    currentTimestamp = isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+                  } catch {
+                    currentTimestamp = "";
+                  }
                 } else if (trimmed && !trimmed.startsWith("powered by") && !trimmed.startsWith("privacy") && trimmed !== "updates") {
                   // Skip navigation/footer content
                   if (!trimmed.includes("earlier)") || trimmed.length > 20) {
