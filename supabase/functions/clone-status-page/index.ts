@@ -98,10 +98,13 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
     const groupInfoMap = new Map<string, { name: string; position: number }>();
     const childComponents: any[] = [];
 
+    // Check if the API provides group structure (Atlassian Statuspage standard)
+    const hasApiGroups = allApiComponents.some((c: any) => c.group === true || c.group_id);
+
     for (const c of allApiComponents) {
-      if (c.group) {
+      if (hasApiGroups && c.group) {
         groupInfoMap.set(c.id, { name: c.name, position: c.position ?? 0 });
-      } else if (c.name !== pageName) {
+      } else if (c.name !== pageName && !(hasApiGroups && c.group)) {
         childComponents.push(c);
       }
     }
@@ -153,6 +156,23 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
       console.log("Stripped HTML for uptime bars, length:", uptimeHtml.length);
 
+      // If API didn't provide group structure, extract from HTML
+      if (!hasApiGroups) {
+        progress("API has no group info, extracting groups from HTML...");
+        const groupMap = extractGroupsFromHtml(rawHtml, services.map(s => s.name));
+        let groupedCount = 0;
+        for (const svc of services) {
+          const group = groupMap.get(svc.name);
+          if (group) {
+            svc.group = group;
+            groupedCount++;
+          }
+        }
+        if (groupedCount > 0) {
+          progress(`Assigned ${groupedCount} services to groups from HTML`);
+        }
+      }
+
       const serviceNames = services.map(s => s.name);
       let uptimeMap: Map<string, { uptime_pct?: number | null; uptime_days?: (boolean | null)[] | null }>;
 
@@ -190,6 +210,93 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
     console.log("Statuspage API not available:", e.message);
     return null;
   }
+}
+
+// ── Extract group structure from HTML ──
+// incident.io-style pages render groups in HTML but don't expose them via API.
+// Groups appear as collapsible sections with "N components" text.
+function extractGroupsFromHtml(html: string, serviceNames: string[]): Map<string, string> {
+  const result = new Map<string, string>();
+
+  // Step 1: Find all "N components" markers and extract the group name from nearby text.
+  // Pattern: look for "N components" and scan backwards to find the group heading.
+  const componentMarkerRegex = /(\d+)\s*components?/gi;
+  const groupEntries: { name: string; pos: number }[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = componentMarkerRegex.exec(html)) !== null) {
+    const markerPos = match.index;
+    // Look backwards up to 500 chars to find a heading-like element
+    const lookback = html.slice(Math.max(0, markerPos - 500), markerPos);
+
+    // Find the last text content in a tag before the marker
+    // Pattern: >Some Text< — we want the last one before "N components"
+    const textMatches = [...lookback.matchAll(/>([^<]{2,80}?)</g)];
+    if (textMatches.length === 0) continue;
+
+    // Walk backwards through text matches to find the group name
+    // Skip entries that are just numbers, whitespace, "uptime", percentage, or "Operational" etc.
+    let groupName: string | null = null;
+    for (let i = textMatches.length - 1; i >= 0; i--) {
+      const candidate = textMatches[i][1].replace(/\s+/g, " ").trim();
+      if (
+        candidate.length < 2 ||
+        /^\d+$/.test(candidate) ||
+        /^\d+%/.test(candidate) ||
+        /^(operational|degraded|partial|major|maintenance|uptime|subscribe|100%|99)/i.test(candidate) ||
+        /components?$/i.test(candidate)
+      ) continue;
+      // Don't use a service name as a group name
+      if (serviceNames.some(s => s.toLowerCase() === candidate.toLowerCase())) continue;
+      groupName = candidate;
+      break;
+    }
+
+    if (groupName) {
+      // Avoid duplicates
+      if (!groupEntries.some(g => g.name === groupName)) {
+        groupEntries.push({ name: groupName, pos: markerPos });
+      }
+    }
+  }
+
+  if (groupEntries.length === 0) {
+    console.log("extractGroupsFromHtml: no groups found");
+    return result;
+  }
+
+  // Step 2: For each group, find which services appear between this group and the next
+  // Sort groups by position
+  groupEntries.sort((a, b) => a.pos - b.pos);
+
+  // Find positions of each service name in the HTML (first occurrence)
+  const servicePositions: { name: string; pos: number }[] = [];
+  for (const name of serviceNames) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Match service name in text content (between > and <)
+    const svcRegex = new RegExp(`>\\s*${escaped}\\s*<`, "i");
+    const svcMatch = svcRegex.exec(html);
+    if (svcMatch) {
+      servicePositions.push({ name, pos: svcMatch.index });
+    }
+  }
+
+  // For each group, find services that appear after it and before the next group
+  for (let gi = 0; gi < groupEntries.length; gi++) {
+    const groupStart = groupEntries[gi].pos;
+    const groupEnd = gi + 1 < groupEntries.length ? groupEntries[gi + 1].pos : html.length;
+    const groupName = groupEntries[gi].name;
+
+    for (const sp of servicePositions) {
+      // Service must appear after the group marker and before the next group
+      if (sp.pos > groupStart && sp.pos < groupEnd) {
+        result.set(sp.name, groupName);
+      }
+    }
+  }
+
+  console.log(`extractGroupsFromHtml: found ${groupEntries.length} groups (${groupEntries.map(g => g.name).join(", ")}), mapped ${result.size} services`);
+  return result;
 }
 
 // ── Incident extraction via Atlassian API ──
