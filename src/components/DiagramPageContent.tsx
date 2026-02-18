@@ -226,12 +226,13 @@ export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }
             ) : (
               <div
                 ref={dropZoneRef}
+                tabIndex={0}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors outline-none ${
                   dragOver ? "border-primary bg-accent/50" : "border-border"
-                }`}
+                } focus:border-primary/60 focus:ring-2 focus:ring-primary/20`}
               >
                 <div className="flex flex-col items-center gap-3">
                   <Image className="h-10 w-10 text-muted-foreground" />
