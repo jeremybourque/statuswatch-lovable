@@ -418,9 +418,20 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                               ))}
                             </SelectContent>
                           </Select>
-                          <span className="text-sm text-muted-foreground">
-                            — {(() => { try { return format(parseISO(update.timestamp), "MMM d, h:mm a"); } catch { return update.timestamp; } })()}
-                          </span>
+                          <span className="text-sm text-muted-foreground">—</span>
+                          <input
+                            type="datetime-local"
+                            value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
+                            onChange={(e) => {
+                              setAnalyzed((prev) => {
+                                if (!prev) return prev;
+                                const updates = [...prev.updates];
+                                updates[i] = { ...updates[i], timestamp: new Date(e.target.value).toISOString() };
+                                return { ...prev, updates };
+                              });
+                            }}
+                            className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
+                          />
                         </div>
                         <textarea
                           value={update.message}
