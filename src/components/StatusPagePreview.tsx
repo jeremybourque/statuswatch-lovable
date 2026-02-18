@@ -314,13 +314,15 @@ export function StatusPagePreview({
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (() => {
-          // Group services: grouped ones under their group header, ungrouped standalone
+          // Group services preserving original order: consecutive services with the same group
+          // are collected together; ungrouped services each form their own block.
           const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
           services.forEach((service, i) => {
             const g = service.group || null;
-            const existing = groups.find((gr) => gr.group === g);
-            if (existing) {
-              existing.items.push({ service, originalIndex: i });
+            const last = groups.length > 0 ? groups[groups.length - 1] : null;
+            if (g && last && last.group === g) {
+              // Same named group as previous — append
+              last.items.push({ service, originalIndex: i });
             } else {
               groups.push({ group: g, items: [{ service, originalIndex: i }] });
             }
