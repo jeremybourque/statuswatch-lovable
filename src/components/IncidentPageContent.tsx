@@ -299,15 +299,22 @@ export function IncidentPageContent() {
                           });
                         }}
                       >
-                        <SelectTrigger className="w-[180px] h-8 text-sm">
-                          <SelectValue />
+                        <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                          <div className="flex items-center gap-2">
+                            <StatusDot status={service.status} />
+                            <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                              {statusConfig[service.status]?.label}
+                            </span>
+                          </div>
                         </SelectTrigger>
                         <SelectContent>
                           {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
                             <SelectItem key={s} value={s}>
                               <div className="flex items-center gap-2">
-                                <StatusDot status={s} />
-                                <span>{statusConfig[s].label}</span>
+                                <span className={`relative flex h-3 w-3`}>
+                                  <span className={`relative inline-flex rounded-full h-3 w-3 ${statusConfig[s].dotClass}`} />
+                                </span>
+                                <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
                               </div>
                             </SelectItem>
                           ))}
