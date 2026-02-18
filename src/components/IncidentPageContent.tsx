@@ -303,7 +303,7 @@ export function IncidentPageContent() {
                               return { ...prev, services: updated };
                             });
                           }}
-                          className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent/30 focus:bg-accent/30 rounded px-1 -mx-1 transition-colors"
+                          className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
                         />
                       </div>
                       <Select
