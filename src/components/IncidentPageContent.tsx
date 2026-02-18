@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Zap, PenLine, ChevronDown } from "lucide-react";
+import { Loader2, Plus, Zap, PenLine, ChevronDown, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -304,12 +304,11 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
           </div>
 
           {/* Services */}
-          {analyzed.services.length > 0 && (
-            <div className="space-y-3">
+          <div className="space-y-3">
               <h3 className="text-xl font-semibold text-foreground">Affected Services</h3>
-              <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-                {analyzed.services.map((service, i) => {
-                  return (
+              {analyzed.services.length > 0 && (
+                <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+                  {analyzed.services.map((service, i) => (
                     <div key={i} className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors">
                       <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
                         <StatusDot status={service.status} />
@@ -327,40 +326,68 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                           className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
                         />
                       </div>
-                      <Select
-                        value={service.status}
-                        onValueChange={(val) => {
-                          setAnalyzed((prev) => {
-                            if (!prev) return prev;
-                            const updated = [...prev.services];
-                            updated[i] = { ...updated[i], status: val as ServiceStatus };
-                            return { ...prev, services: updated };
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
-                              {statusConfig[service.status]?.label}
-                            </span>
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                            <SelectItem key={s} value={s}>
-                              <div className="flex items-center gap-2">
-                                <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={service.status}
+                          onValueChange={(val) => {
+                            setAnalyzed((prev) => {
+                              if (!prev) return prev;
+                              const updated = [...prev.services];
+                              updated[i] = { ...updated[i], status: val as ServiceStatus };
+                              return { ...prev, services: updated };
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                                {statusConfig[service.status]?.label}
+                              </span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                              <SelectItem key={s} value={s}>
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => {
+                            setAnalyzed((prev) => {
+                              if (!prev) return prev;
+                              const updated = prev.services.filter((_, idx) => idx !== i);
+                              return { ...prev, services: updated };
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setAnalyzed((prev) => {
+                    if (!prev) return prev;
+                    return { ...prev, services: [...prev.services, { name: "New Service", status: "operational" }] };
+                  });
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Service
+              </Button>
             </div>
-          )}
 
           {/* Editable Incident Details */}
           <div className="space-y-4">
@@ -390,7 +417,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                 <div className="px-4 pb-4">
                   <div className="ml-5 border-l-2 border-border pl-6 space-y-4">
                     {analyzed.updates.map((update, i) => (
-                      <div key={i} className="relative">
+                      <div key={i} className="relative group">
                         <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-border border-2 border-card" />
                         <div className="flex items-center gap-2">
                           <Select
@@ -432,6 +459,21 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                             }}
                             className="text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
                           />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            onClick={() => {
+                              setAnalyzed((prev) => {
+                                if (!prev) return prev;
+                                const updates = prev.updates.filter((_, idx) => idx !== i);
+                                const newStatus = updates.length > 0 ? updates[0].status : prev.status;
+                                return { ...prev, updates, status: newStatus };
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                         <textarea
                           value={update.message}
@@ -452,6 +494,25 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                 </div>
               )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAnalyzed((prev) => {
+                  if (!prev) return prev;
+                  const newUpdate: AnalyzedUpdate = {
+                    status: "investigating",
+                    message: "New update...",
+                    timestamp: new Date().toISOString(),
+                  };
+                  const updates = [newUpdate, ...prev.updates];
+                  return { ...prev, updates, status: newUpdate.status };
+                });
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Update
+            </Button>
           </div>
 
           <div className="flex items-center gap-3">
