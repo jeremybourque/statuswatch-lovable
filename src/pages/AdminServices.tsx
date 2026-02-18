@@ -816,7 +816,7 @@ const AdminServices = () => {
       ) : (
         <main className="max-w-4xl mx-auto px-4 py-8">
           <Tabs defaultValue={defaultTab}>
-            <TabsList className="mb-6 px-2">
+            <TabsList className="mb-6 px-4">
               <TabsTrigger value="details">Page Details</TabsTrigger>
               <TabsTrigger value="services">Services ({services.filter(s => s.status !== "operational").length}/{services.length})</TabsTrigger>
               <TabsTrigger value="incidents">Incidents ({incidents.filter(i => i.status !== "resolved").length}/{incidents.length})</TabsTrigger>
