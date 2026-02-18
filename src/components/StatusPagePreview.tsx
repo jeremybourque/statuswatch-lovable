@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Globe } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,7 @@ interface StatusPagePreviewProps {
   initialIncidents: PreviewIncident[];
   initialName?: string;
   initialSlug?: string;
+  initialLogoUrl?: string | null;
   navigateTo?: string;
 }
 
@@ -94,6 +95,7 @@ export function StatusPagePreview({
   initialIncidents,
   initialName = "",
   initialSlug = "",
+  initialLogoUrl = null,
   navigateTo = "/",
 }: StatusPagePreviewProps) {
   const { toast } = useToast();
@@ -228,13 +230,20 @@ export function StatusPagePreview({
 
   return (
     <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => handleNameChange(e.target.value)}
-        placeholder="Page Name"
-        className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-      />
+      <div className="flex items-center gap-3">
+        {initialLogoUrl ? (
+          <img src={initialLogoUrl} alt="" className="h-8 w-8 rounded object-contain shrink-0" />
+        ) : (
+          <Globe className="h-8 w-8 text-muted-foreground shrink-0" />
+        )}
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          placeholder="Page Name"
+          className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+        />
+      </div>
 
       <StatusBanner status={getOverallStatus(services)} />
 
