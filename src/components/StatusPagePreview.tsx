@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2, Globe } from "lucide-react";
+import { Loader2, Plus, Trash2, Activity } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -234,7 +234,7 @@ export function StatusPagePreview({
         {initialLogoUrl ? (
           <img src={initialLogoUrl} alt="" className="h-8 w-8 rounded object-contain shrink-0" />
         ) : (
-          <Globe className="h-8 w-8 text-muted-foreground shrink-0" />
+          <Activity className="h-8 w-8 text-primary shrink-0" />
         )}
         <input
           type="text"
