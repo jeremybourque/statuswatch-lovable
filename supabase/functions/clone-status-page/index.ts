@@ -28,6 +28,7 @@ interface ExtractedIncident {
   impact: ServiceStatus;
   created_at: string;
   detail_url?: string | null;
+  api_id?: string | null;
   updates: ExtractedIncidentUpdate[];
 }
 
@@ -384,6 +385,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
         impact: mapIncidentImpact(inc.impact),
         created_at: inc.created_at,
         detail_url: inc.shortlink || null,
+        api_id: inc.id,
         updates,
       });
     }
@@ -403,17 +405,6 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   if (incidentsNeedingDetail.length > 0) {
     progress(`Fetching details for ${incidentsNeedingDetail.length} incidents with missing update content...`);
     
-    // Build incident page URLs using the API IDs
-    const idByTitle = new Map<string, string>();
-    const allIds = [...seenIds];
-    let idx = 0;
-    for (const inc of allIncidents) {
-      if (idx < allIds.length) {
-        idByTitle.set(inc.title, allIds[idx]);
-      }
-      idx++;
-    }
-
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
 
     // Process in batches of 5
@@ -421,7 +412,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
       const batch = incidentsNeedingDetail.slice(i, i + 5);
       await Promise.allSettled(
         batch.map(async (inc) => {
-          const apiId = idByTitle.get(inc.title);
+          const apiId = inc.api_id;
           if (!apiId) return;
           
           // Try scraping the incident page for update content
