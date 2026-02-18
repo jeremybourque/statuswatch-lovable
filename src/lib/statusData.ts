@@ -11,7 +11,7 @@ export interface Service {
 }
 
 export interface IncidentUpdate {
-  status: "investigating" | "identified" | "monitoring" | "resolved";
+  status: "investigating" | "identified" | "monitoring" | "maintenance" | "resolved";
   message: string;
   timestamp: string;
 }
@@ -19,7 +19,7 @@ export interface IncidentUpdate {
 export interface Incident {
   id: string;
   title: string;
-  status: "investigating" | "identified" | "monitoring" | "resolved";
+  status: "investigating" | "identified" | "monitoring" | "maintenance" | "resolved";
   impact: ServiceStatus;
   createdAt: string;
   updates: IncidentUpdate[];
