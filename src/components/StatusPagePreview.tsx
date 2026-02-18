@@ -484,17 +484,26 @@ export function StatusPagePreview({
                             />
                           </div>
                           <textarea
+                            ref={(el) => {
+                              if (el) {
+                                el.style.height = "auto";
+                                el.style.height = el.scrollHeight + "px";
+                              }
+                            }}
                             value={update.message}
                             onFocus={(e) => { const el = e.target; if (el.value === "New update...") requestAnimationFrame(() => el.select()); }}
                             onChange={(e) => {
+                              const el = e.target;
+                              el.style.height = "auto";
+                              el.style.height = el.scrollHeight + "px";
                               updateIncident(incIndex, (prev) => {
                                 const updates = [...prev.updates];
                                 updates[i] = { ...updates[i], message: e.target.value };
                                 return { ...prev, updates };
                               });
                             }}
-                            className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
-                            rows={2}
+                            className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none overflow-hidden"
+                            rows={1}
                           />
                         </div>
                         <Button
