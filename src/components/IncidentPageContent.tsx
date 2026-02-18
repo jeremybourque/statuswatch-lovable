@@ -522,18 +522,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleCreate}
-              disabled={creating || !name.trim() || !slug.trim()}
-            >
-              {creating ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Plus className="h-4 w-4 mr-1" />
-              )}
-              Create Status Page
-            </Button>
+          <div className="flex items-center justify-between gap-3">
             {!creating && (!name.trim() || !slug.trim()) && (
               <p className="text-sm text-muted-foreground">
                 {!name.trim() && !slug.trim()
@@ -543,6 +532,18 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                     : "Enter a slug above to continue."}
               </p>
             )}
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !name.trim() || !slug.trim()}
+              className="ml-auto shrink-0"
+            >
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Plus className="h-4 w-4 mr-1" />
+              )}
+              Create Status Page
+            </Button>
           </div>
         </section>
       )}
