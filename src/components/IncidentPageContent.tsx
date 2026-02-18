@@ -116,7 +116,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       <section
         className={`border rounded-xl p-6 transition-colors duration-300 ${
           collapsed
-            ? "border-border bg-accent/50 cursor-pointer"
+            ? "border-input bg-background cursor-pointer"
             : "border-border bg-card"
         }`}
       >
