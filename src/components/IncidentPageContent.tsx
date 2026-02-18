@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Zap, PenLine } from "lucide-react";
+import { Loader2, Plus, Zap, PenLine, ChevronDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -281,14 +282,37 @@ export function IncidentPageContent() {
               <h3 className="text-xl font-semibold text-foreground">Affected Services</h3>
               <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
                 {analyzed.services.map((service, i) => {
-                  const config = statusConfig[service.status] ?? statusConfig.operational;
                   return (
                     <div key={i} className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <StatusDot status={service.status} />
                         <span className="font-medium text-card-foreground">{service.name}</span>
                       </div>
-                      <span className={`text-sm font-medium ${config.colorClass}`}>{config.label}</span>
+                      <Select
+                        value={service.status}
+                        onValueChange={(val) => {
+                          setAnalyzed((prev) => {
+                            if (!prev) return prev;
+                            const updated = [...prev.services];
+                            updated[i] = { ...updated[i], status: val as ServiceStatus };
+                            return { ...prev, services: updated };
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px] h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>
+                              <div className="flex items-center gap-2">
+                                <StatusDot status={s} />
+                                <span>{statusConfig[s].label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   );
                 })}
