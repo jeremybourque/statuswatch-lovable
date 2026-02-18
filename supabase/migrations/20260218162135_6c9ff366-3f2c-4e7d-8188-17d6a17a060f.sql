@@ -1,0 +1,1 @@
+ALTER TABLE public.resources ADD COLUMN favicon_url text;

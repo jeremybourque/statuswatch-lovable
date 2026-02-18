@@ -29,6 +29,7 @@ interface Resource {
   name: string;
   url: string | null;
   content: string | null;
+  favicon_url: string | null;
   created_at: string;
 }
 
@@ -116,7 +117,7 @@ function getFaviconUrl(siteUrl: string, bustCache?: number): string | null {
   }
 }
 
-function ResourceCard({ resource, navigate, onEdit }: { resource: Resource; navigate: ReturnType<typeof useNavigate>; onEdit: () => void }) {
+function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource: Resource; navigate: ReturnType<typeof useNavigate>; onEdit: () => void; onSaveFavicon: (id: string, faviconUrl: string) => void }) {
   const [faviconError, setFaviconError] = useState(false);
   const [cacheBust, setCacheBust] = useState<number | undefined>();
   const [previewBust, setPreviewBust] = useState<number | undefined>();
@@ -138,7 +139,8 @@ function ResourceCard({ resource, navigate, onEdit }: { resource: Resource; navi
     : resource.url;
 
   const actionLabel = resource.type === "status_page" ? "Clone" : "Analyze";
-  const faviconUrl = resource.type === "status_page" && resource.url ? getFaviconUrl(resource.url, cacheBust) : null;
+  const storedFavicon = resource.favicon_url;
+  const faviconUrl = storedFavicon || (resource.type === "status_page" && resource.url ? getFaviconUrl(resource.url) : null);
   const previewUrl = resource.type === "status_page" && resource.url && previewBust ? getFaviconUrl(resource.url, previewBust) : null;
 
   const requestRefresh = () => {
@@ -147,7 +149,9 @@ function ResourceCard({ resource, navigate, onEdit }: { resource: Resource; navi
   };
 
   const confirmRefresh = () => {
-    setCacheBust(previewBust);
+    if (previewUrl) {
+      onSaveFavicon(resource.id, previewUrl);
+    }
     setFaviconError(false);
     setShowPreview(false);
     setPreviewBust(undefined);
@@ -228,11 +232,13 @@ const ResourcesPage = () => {
 
   const upsert = useMutation({
     mutationFn: async (vals: { id?: string; type: ResourceType; name: string; url: string; content: string }) => {
+      const faviconUrl = vals.type === "status_page" && vals.url ? getFaviconUrl(vals.url) : null;
       const row = {
         type: vals.type,
         name: vals.name,
         url: vals.type === "incident_description" ? null : vals.url,
         content: vals.type === "incident_description" ? vals.content : null,
+        ...(faviconUrl && !vals.id ? { favicon_url: faviconUrl } : {}),
       };
       if (vals.id) {
         const { error } = await supabase.from("resources").update(row).eq("id", vals.id);
@@ -247,6 +253,15 @@ const ResourcesPage = () => {
       setDialogOpen(false);
       toast.success("Resource saved");
     },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const saveFavicon = useMutation({
+    mutationFn: async ({ id, faviconUrl }: { id: string; faviconUrl: string }) => {
+      const { error } = await supabase.from("resources").update({ favicon_url: faviconUrl }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["resources"] }),
     onError: (e) => toast.error(e.message),
   });
 
@@ -303,7 +318,7 @@ const ResourcesPage = () => {
                 </div>
                 <div className="space-y-2">
                   {grouped[type].map((r) => (
-                    <ResourceCard key={r.id} resource={r} navigate={navigate} onEdit={() => { setEditing(r); setDialogOpen(true); }} />
+                    <ResourceCard key={r.id} resource={r} navigate={navigate} onEdit={() => { setEditing(r); setDialogOpen(true); }} onSaveFavicon={(id, faviconUrl) => saveFavicon.mutate({ id, faviconUrl })} />
                   ))}
                 </div>
               </section>
