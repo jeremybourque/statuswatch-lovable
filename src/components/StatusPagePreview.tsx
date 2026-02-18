@@ -172,13 +172,13 @@ export function StatusPagePreview({
         ...incidents.flatMap((inc) => inc.services),
       ];
       if (allServices.length > 0) {
-        // Build ordered groups matching visual order
+        // Build ordered groups matching visual order (contiguous runs only)
         const orderedGroups: { group: string | null; items: PreviewService[] }[] = [];
         for (const s of allServices) {
           const g = s.group || null;
-          const existing = orderedGroups.find((gr) => gr.group === g);
-          if (existing) {
-            existing.items.push(s);
+          const lastGroup = orderedGroups.length > 0 ? orderedGroups[orderedGroups.length - 1] : null;
+          if (lastGroup && lastGroup.group === g) {
+            lastGroup.items.push(s);
           } else {
             orderedGroups.push({ group: g, items: [s] });
           }
@@ -350,13 +350,14 @@ export function StatusPagePreview({
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (() => {
-          // Group services: grouped ones under their group header, ungrouped standalone
+          // Group services: keep contiguous runs of same group together, don't merge non-adjacent
           const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
           services.forEach((service, i) => {
             const g = service.group || null;
-            const existing = groups.find((gr) => gr.group === g);
-            if (existing) {
-              existing.items.push({ service, originalIndex: i });
+            const lastGroup = groups.length > 0 ? groups[groups.length - 1] : null;
+            // Only merge into previous group if it's the SAME group (contiguous run)
+            if (lastGroup && lastGroup.group === g) {
+              lastGroup.items.push({ service, originalIndex: i });
             } else {
               groups.push({ group: g, items: [{ service, originalIndex: i }] });
             }
