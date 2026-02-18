@@ -108,8 +108,8 @@ function ResourceForm({
 
 function getFaviconUrl(siteUrl: string, bustCache?: number): string | null {
   try {
-    const domain = new URL(siteUrl).hostname;
-    const base = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    const url = new URL(siteUrl);
+    const base = `https://www.google.com/s2/favicons?domain=${url.origin}&sz=32`;
     return bustCache ? `${base}&_=${bustCache}` : base;
   } catch {
     return null;
