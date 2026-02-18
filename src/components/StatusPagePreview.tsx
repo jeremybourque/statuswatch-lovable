@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2, Activity } from "lucide-react";
+import { Loader2, Plus, Trash2, Activity, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +88,32 @@ function StatusDot({ status }: { status: ServiceStatus }) {
       )}
       <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotClass}`} />
     </span>
+  );
+}
+
+function CollapsibleGroup({ group, groupStatus, children }: { group: string; groupStatus: ServiceStatus; children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between mb-2 group cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <StatusDot status={groupStatus} />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            {group}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
+            {statusConfig[groupStatus].label}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+        </div>
+      </button>
+      {!collapsed && children}
+    </div>
   );
 }
 
@@ -414,22 +440,11 @@ export function StatusPagePreview({
 
                 if (grp.group) {
                   return (
-                    <div key={`group-${gIdx}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <StatusDot status={groupStatus} />
-                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            {grp.group}
-                          </h3>
-                        </div>
-                        <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
-                          {statusConfig[groupStatus].label}
-                        </span>
-                      </div>
+                    <CollapsibleGroup key={`group-${gIdx}`} group={grp.group} groupStatus={groupStatus}>
                       <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
                         {grp.items.map(renderServiceRow)}
                       </div>
-                    </div>
+                    </CollapsibleGroup>
                   );
                 }
 
