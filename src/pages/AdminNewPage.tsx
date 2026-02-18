@@ -14,7 +14,7 @@ const choices = [
     id: "incident" as Choice,
     icon: AlertTriangle,
     iconClass: "text-destructive",
-    label: <span>Active incident—need a page <em>fast!</em></span>,
+    label: "Describe the Incident",
   },
   {
     id: "clone" as Choice,
