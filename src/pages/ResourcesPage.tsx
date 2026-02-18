@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink, RefreshCw, Check } from "lucide-react";
+import { Activity, Plus, ArrowLeft, Globe, Network, FileText, ExternalLink, RefreshCw, Check, Pencil } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -116,7 +116,7 @@ function getFaviconUrl(siteUrl: string, bustCache?: number): string | null {
   }
 }
 
-function ResourceCard({ resource, navigate }: { resource: Resource; navigate: ReturnType<typeof useNavigate> }) {
+function ResourceCard({ resource, navigate, onEdit }: { resource: Resource; navigate: ReturnType<typeof useNavigate>; onEdit: () => void }) {
   const [faviconError, setFaviconError] = useState(false);
   const [cacheBust, setCacheBust] = useState<number | undefined>();
   const [previewBust, setPreviewBust] = useState<number | undefined>();
@@ -175,6 +175,15 @@ function ResourceCard({ resource, navigate }: { resource: Resource; navigate: Re
           <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
         </div>
         <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-8 w-8 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
+          onClick={onEdit}
+          title="Edit resource"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
           variant="outline"
           size="sm"
           className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
@@ -203,6 +212,7 @@ const ResourcesPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Resource | undefined>();
 
   const { data: resources = [], isLoading } = useQuery({
     queryKey: ["resources"],
@@ -217,15 +227,20 @@ const ResourcesPage = () => {
   });
 
   const upsert = useMutation({
-    mutationFn: async (vals: { type: ResourceType; name: string; url: string; content: string }) => {
+    mutationFn: async (vals: { id?: string; type: ResourceType; name: string; url: string; content: string }) => {
       const row = {
         type: vals.type,
         name: vals.name,
         url: vals.type === "incident_description" ? null : vals.url,
         content: vals.type === "incident_description" ? vals.content : null,
       };
-      const { error } = await supabase.from("resources").insert(row);
-      if (error) throw error;
+      if (vals.id) {
+        const { error } = await supabase.from("resources").update(row).eq("id", vals.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("resources").insert(row);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["resources"] });
@@ -288,7 +303,7 @@ const ResourcesPage = () => {
                 </div>
                 <div className="space-y-2">
                   {grouped[type].map((r) => (
-                    <ResourceCard key={r.id} resource={r} navigate={navigate} />
+                    <ResourceCard key={r.id} resource={r} navigate={navigate} onEdit={() => { setEditing(r); setDialogOpen(true); }} />
                   ))}
                 </div>
               </section>
@@ -297,14 +312,15 @@ const ResourcesPage = () => {
         )}
       </main>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditing(undefined); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Resource</DialogTitle>
+            <DialogTitle>{editing ? "Edit Resource" : "New Resource"}</DialogTitle>
           </DialogHeader>
           <ResourceForm
+            initial={editing}
             onCancel={() => setDialogOpen(false)}
-            onSubmit={(vals) => upsert.mutate(vals)}
+            onSubmit={(vals) => upsert.mutate({ ...vals, id: editing?.id })}
           />
         </DialogContent>
       </Dialog>
