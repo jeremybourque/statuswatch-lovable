@@ -206,6 +206,8 @@ export function ClonePageContent() {
   const previewServices: PreviewService[] = extracted?.services?.map((s) => ({
     name: s.name,
     status: s.status,
+    uptimeDays: s.uptime_days ?? undefined,
+    uptime: s.uptime_pct ?? undefined,
   })) ?? [];
 
   const previewIncidents: PreviewIncident[] = extracted?.incidents?.map((inc) => ({
