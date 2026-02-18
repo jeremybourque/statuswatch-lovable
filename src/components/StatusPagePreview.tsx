@@ -241,28 +241,24 @@ export function StatusPagePreview({
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
           placeholder="Page Name"
-          className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+          className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 flex-1 min-w-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
         />
-      </div>
-
-      <StatusBanner status={getOverallStatus(services)} />
-
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="preview-slug" className="text-xs text-muted-foreground">Slug:</Label>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-sm text-muted-foreground">/</span>
           <input
-            id="preview-slug"
             type="text"
             value={slug}
             onChange={(e) => {
               setSlugManual(true);
               setSlug(slugify(e.target.value));
             }}
-            className="text-xs text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
+            placeholder="slug"
+            className="font-mono text-sm text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors w-40"
           />
         </div>
-        <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
       </div>
+
+      <StatusBanner status={getOverallStatus(services)} />
 
       {/* Services */}
       <div className="space-y-3">
