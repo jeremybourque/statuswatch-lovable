@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useLayoutEffect, useCallback, useEffect } from "react";
 import { Activity, ArrowLeft, FileText, AlertTriangle, Network, PenLine } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,18 @@ const AdminNewPage = () => {
   const from = searchParams.get("from");
   const initialChoice = searchParams.get("choice") as Choice | null;
   const diagramUrl = searchParams.get("diagramUrl");
+  const [incidentDescription, setIncidentDescription] = useState<string | undefined>();
   const backTo = "/";
+
+  useEffect(() => {
+    if (initialChoice === "incident") {
+      const stored = sessionStorage.getItem("preloadIncidentDescription");
+      if (stored) {
+        setIncidentDescription(stored);
+        sessionStorage.removeItem("preloadIncidentDescription");
+      }
+    }
+  }, [initialChoice]);
 
   const [selected, setSelected] = useState<Choice | null>(initialChoice);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -150,7 +161,7 @@ const AdminNewPage = () => {
             }}
           >
             {selected === "clone" && <ClonePageContent />}
-            {selected === "incident" && <IncidentPageContent navigateTo={backTo} />}
+            {selected === "incident" && <IncidentPageContent navigateTo={backTo} initialDescription={incidentDescription} />}
             {selected === "diagram" && <DiagramPageContent navigateTo={backTo} initialUrl={diagramUrl || undefined} />}
             {selected === "manual" && (
               <StatusPagePreview

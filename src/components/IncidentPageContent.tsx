@@ -13,10 +13,10 @@ function slugify(text: string) {
     .replace(/^-|-$/g, "");
 }
 
-export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string }) {
+export function IncidentPageContent({ navigateTo = "/", initialDescription }: { navigateTo?: string; initialDescription?: string }) {
   const { toast } = useToast();
 
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialDescription || "");
   const [analyzing, setAnalyzing] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [previewData, setPreviewData] = useState<{
