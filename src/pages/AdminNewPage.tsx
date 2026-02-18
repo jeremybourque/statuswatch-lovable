@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useCallback, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useCallback } from "react";
 import { Activity, ArrowLeft, FileText, AlertTriangle, Network, PenLine } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -43,18 +43,17 @@ const AdminNewPage = () => {
   const from = searchParams.get("from");
   const initialChoice = searchParams.get("choice") as Choice | null;
   const diagramUrl = searchParams.get("diagramUrl");
-  const [incidentDescription, setIncidentDescription] = useState<string | undefined>();
-  const backTo = "/";
-
-  useEffect(() => {
+  const [incidentDescription] = useState<string | undefined>(() => {
     if (initialChoice === "incident") {
       const stored = sessionStorage.getItem("preloadIncidentDescription");
       if (stored) {
-        setIncidentDescription(stored);
         sessionStorage.removeItem("preloadIncidentDescription");
+        return stored;
       }
     }
-  }, [initialChoice]);
+    return undefined;
+  });
+  const backTo = "/";
 
   const [selected, setSelected] = useState<Choice | null>(initialChoice);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
