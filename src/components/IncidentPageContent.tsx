@@ -93,6 +93,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
     if (!text.trim()) return;
     setAnalyzing(true);
     setAnalyzed(null);
+    setAdditionalIncidents([]);
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
