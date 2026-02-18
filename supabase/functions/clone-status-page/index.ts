@@ -366,11 +366,13 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
 
   const allIncidents: ExtractedIncident[] = [];
   const seenIds = new Set<string>();
+  const incidentApiIds: string[] = [];
 
   const parseIncidents = (data: any) => {
     for (const inc of (data?.incidents || [])) {
       if (seenIds.has(inc.id)) continue;
       seenIds.add(inc.id);
+      incidentApiIds.push(inc.id);
       const updates: ExtractedIncidentUpdate[] = (inc.incident_updates || []).map((u: any) => ({
         status: mapIncidentStatus(u.status),
         message: u.body || "",
@@ -391,6 +393,61 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
 
   // Sort newest first
   allIncidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // For incidents with empty update messages, fetch individual incident details
+  const incidentsNeedingDetail = allIncidents.filter(
+    (inc, i) => inc.updates.some(u => !u.message.trim()) && i < 25
+  );
+
+  if (incidentsNeedingDetail.length > 0) {
+    progress(`Fetching details for ${incidentsNeedingDetail.length} incidents with missing update content...`);
+    
+    // Find the API IDs that correspond to these incidents
+    const idByTitle = new Map<string, string>();
+    const allIds = [...seenIds];
+    // Re-map: we stored them in order, match by index
+    let idx = 0;
+    for (const inc of allIncidents) {
+      if (idx < allIds.length) {
+        idByTitle.set(inc.title, allIds[idx]);
+      }
+      idx++;
+    }
+
+    // Process in batches of 5
+    for (let i = 0; i < incidentsNeedingDetail.length; i += 5) {
+      const batch = incidentsNeedingDetail.slice(i, i + 5);
+      await Promise.allSettled(
+        batch.map(async (inc) => {
+          const apiId = idByTitle.get(inc.title);
+          if (!apiId) return;
+          try {
+            const detailRes = await fetch(`${origin}/api/v2/incidents/${apiId}.json`, {
+              headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+            });
+            if (!detailRes.ok) return;
+            const detailData = await detailRes.json();
+            const detailInc = detailData?.incident;
+            if (!detailInc?.incident_updates?.length) return;
+            
+            const detailUpdates: ExtractedIncidentUpdate[] = detailInc.incident_updates.map((u: any) => ({
+              status: mapIncidentStatus(u.status),
+              message: u.body || "",
+              timestamp: u.created_at || u.updated_at || detailInc.created_at,
+            }));
+            
+            // Only replace if we got better data
+            const hasContent = detailUpdates.some(u => u.message.trim().length > 0);
+            if (hasContent) {
+              inc.updates = detailUpdates;
+            }
+          } catch (e: any) {
+            console.warn(`Could not fetch detail for incident "${inc.title}":`, e.message);
+          }
+        })
+      );
+    }
+  }
 
   return allIncidents;
 }
