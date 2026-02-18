@@ -57,17 +57,17 @@ function PageRow({ page, onDelete }: { page: StatusPage; onDelete: (id: string, 
         </p>
       </div>
       <div className="flex items-center gap-1">
-        <Link to={`/admin/${page.slug}/services?tab=details`}>
+        <Link to={`/${page.slug}/edit?tab=details`}>
           <Button variant="ghost" size="icon" title="Edit page details">
             <Pencil className="h-4 w-4" />
           </Button>
         </Link>
-        <Link to={`/admin/${page.slug}/services?tab=services`}>
+        <Link to={`/${page.slug}/edit?tab=services`}>
           <Button variant="ghost" size="icon" title="Edit services">
             <Server className="h-4 w-4" />
           </Button>
         </Link>
-        <Link to={`/admin/${page.slug}/services?tab=incidents`}>
+        <Link to={`/${page.slug}/edit?tab=incidents`}>
           <Button variant="ghost" size="icon" title="Edit incidents">
             <AlertTriangle className="h-4 w-4" />
           </Button>

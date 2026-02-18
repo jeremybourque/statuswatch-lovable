@@ -23,7 +23,7 @@ const App = () => (
           <Route path="/" element={<StatusPagesIndex />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/new" element={<AdminNewPage />} />
-          <Route path="/admin/:slug/services" element={<AdminServices />} />
+          <Route path="/:slug/edit" element={<AdminServices />} />
           <Route path="/admin/clone" element={<AdminClonePage />} />
           <Route path="/:slug" element={<StatusPageDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
