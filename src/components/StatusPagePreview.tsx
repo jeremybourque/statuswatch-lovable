@@ -228,31 +228,31 @@ export function StatusPagePreview({
 
   return (
     <section className="border border-border rounded-xl bg-card p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-card-foreground">Preview</h2>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => handleNameChange(e.target.value)}
+        placeholder="Page Name"
+        className="text-2xl font-bold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+      />
 
       <StatusBanner status={getOverallStatus(services)} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="preview-name">Page Name</Label>
-          <Input
-            id="preview-name"
-            value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="preview-slug">Slug</Label>
-          <Input
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="preview-slug" className="text-xs text-muted-foreground">Slug:</Label>
+          <input
             id="preview-slug"
+            type="text"
             value={slug}
             onChange={(e) => {
               setSlugManual(true);
               setSlug(slugify(e.target.value));
             }}
+            className="text-xs text-muted-foreground bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors"
           />
-          <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
         </div>
+        <p className="text-xs text-muted-foreground">URL path: /{slug || "..."}</p>
       </div>
 
       {/* Services */}
