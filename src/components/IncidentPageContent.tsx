@@ -7,11 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBanner } from "@/components/StatusBanner";
-import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { statusConfig, type ServiceStatus } from "@/lib/statusData";
-import type { Incident } from "@/lib/statusData";
+import { format, parseISO } from "date-fns";
 
 interface AnalyzedService {
   name: string;
@@ -19,18 +18,36 @@ interface AnalyzedService {
 }
 
 interface AnalyzedUpdate {
-  status: "investigating" | "identified" | "monitoring" | "resolved";
+  status: "investigating" | "identified" | "monitoring" | "maintenance" | "resolved";
   message: string;
   timestamp: string;
 }
 
 interface AnalyzedIncident {
   title: string;
-  status: "investigating" | "identified" | "monitoring" | "resolved";
+  status: "investigating" | "identified" | "monitoring" | "maintenance" | "resolved";
   impact: ServiceStatus;
   services: AnalyzedService[];
   updates: AnalyzedUpdate[];
 }
+
+const updateStatusColors: Record<string, string> = {
+  investigating: "text-status-major",
+  identified: "text-status-partial",
+  monitoring: "text-status-degraded",
+  maintenance: "text-status-maintenance",
+  resolved: "text-status-operational",
+};
+
+const updateStatusBg: Record<string, string> = {
+  investigating: "bg-status-major",
+  identified: "bg-status-partial",
+  monitoring: "bg-status-degraded",
+  maintenance: "bg-status-maintenance",
+  resolved: "bg-status-operational",
+};
+
+const updateStatuses = ["investigating", "identified", "monitoring", "maintenance", "resolved"] as const;
 
 function slugify(text: string) {
   return text
@@ -341,25 +358,117 @@ export function IncidentPageContent() {
             </div>
           )}
 
-          {/* Incident timeline */}
-          {analyzed.updates.length > 0 && (
-            <IncidentTimeline
-              incidents={[
-                {
-                  id: "preview",
-                  title: analyzed.title,
-                  status: analyzed.status,
-                  impact: analyzed.impact,
-                  createdAt: analyzed.updates[analyzed.updates.length - 1]?.timestamp || new Date().toISOString(),
-                  updates: analyzed.updates.map((u) => ({
-                    status: u.status,
-                    message: u.message,
-                    timestamp: u.timestamp,
-                  })),
-                },
-              ]}
-            />
-          )}
+          {/* Editable Incident Details */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-foreground">Incident Details</h2>
+            <div className="border border-border rounded-lg bg-card overflow-hidden">
+              {/* Incident header */}
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-1.5 h-8 rounded-full ${updateStatusBg[analyzed.status]}`} />
+                  <input
+                    type="text"
+                    value={analyzed.title}
+                    onChange={(e) => setAnalyzed((prev) => prev ? { ...prev, title: e.target.value } : prev)}
+                    className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                  />
+                </div>
+                <div className="flex items-center gap-4 ml-5">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Status:</Label>
+                    <Select
+                      value={analyzed.status}
+                      onValueChange={(val) => setAnalyzed((prev) => prev ? { ...prev, status: val as AnalyzedIncident["status"] } : prev)}
+                    >
+                      <SelectTrigger className="h-7 text-xs border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-2">
+                        <span className={`font-medium capitalize ${updateStatusColors[analyzed.status]}`}>{analyzed.status}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {updateStatuses.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Impact:</Label>
+                    <Select
+                      value={analyzed.impact}
+                      onValueChange={(val) => setAnalyzed((prev) => prev ? { ...prev, impact: val as ServiceStatus } : prev)}
+                    >
+                      <SelectTrigger className="h-7 text-xs border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-2">
+                        <span className={`font-medium ${statusConfig[analyzed.impact]?.colorClass}`}>{statusConfig[analyzed.impact]?.label}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                          <SelectItem key={s} value={s}>
+                            <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Editable updates timeline */}
+              {analyzed.updates.length > 0 && (
+                <div className="px-4 pb-4">
+                  <div className="ml-5 border-l-2 border-border pl-6 space-y-4">
+                    {analyzed.updates.map((update, i) => (
+                      <div key={i} className="relative">
+                        <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-border border-2 border-card" />
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={update.status}
+                            onValueChange={(val) => {
+                              setAnalyzed((prev) => {
+                                if (!prev) return prev;
+                                const updates = [...prev.updates];
+                                updates[i] = { ...updates[i], status: val as AnalyzedUpdate["status"] };
+                                return { ...prev, updates };
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-6 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-1">
+                              <span className={`font-semibold capitalize ${updateStatusColors[update.status]}`}>
+                                {update.status}
+                              </span>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {updateStatuses.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  <span className={`font-medium capitalize ${updateStatusColors[s]}`}>{s}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-sm text-muted-foreground">
+                            — {(() => { try { return format(parseISO(update.timestamp), "MMM d, h:mm a"); } catch { return update.timestamp; } })()}
+                          </span>
+                        </div>
+                        <textarea
+                          value={update.message}
+                          onChange={(e) => {
+                            setAnalyzed((prev) => {
+                              if (!prev) return prev;
+                              const updates = [...prev.updates];
+                              updates[i] = { ...updates[i], message: e.target.value };
+                              return { ...prev, updates };
+                            });
+                          }}
+                          className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none"
+                          rows={2}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="flex items-center gap-3">
             <Button
