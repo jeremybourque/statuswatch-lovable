@@ -414,49 +414,66 @@ function classifyUptimeClass(className: string): boolean | null | undefined {
 }
 /**
  * Detect group structure from rendered HTML when the API doesn't provide it.
- * Looks for patterns like a group header name followed by "N components" text,
- * then assigns child services that appear between this group header and the next.
+ * Strategy: strip all HTML tags to get plain text, then find "N components" markers
+ * and look backwards for the group name (which won't be a known service name).
  */
 function detectGroupsFromHTML(
   html: string,
   serviceNames: string[],
 ): Map<string, string> {
   const assignments = new Map<string, string>();
+  const serviceNameSet = new Set(serviceNames);
 
-  // Find group headers: text like "On-call notifications" followed by "N component(s)"
-  // Pattern: a service-like name that's NOT in our service list, followed by "N components"
-  const groupPattern = />([\w@\-. ]+?)<[^>]*>[^<]*?(\d+)\s*components?/gi;
+  // Approach 1: Search for "N component(s)" in the raw HTML and extract nearby text
+  // We look for the pattern in raw HTML, then scan backwards to find the group name
+  const componentPattern = /(\d+)\s*components?/gi;
   const groups: { name: string; index: number }[] = [];
 
   let match: RegExpExecArray | null;
-  while ((match = groupPattern.exec(html)) !== null) {
-    const groupName = match[1].trim();
-    // Only treat as group if it's not already a known service
-    if (groupName && !serviceNames.includes(groupName)) {
-      groups.push({ name: groupName, index: match.index });
+  while ((match = componentPattern.exec(html)) !== null) {
+    const matchIdx = match.index;
+    // Look backwards up to 500 chars to find the group name
+    const lookback = html.slice(Math.max(0, matchIdx - 500), matchIdx);
+    // Extract all text content from tags in the lookback region
+    // Find the last >text< before the "N components" marker
+    const textMatches = [...lookback.matchAll(/>([^<]{2,})</g)];
+    // Walk backwards through text matches to find a non-service name
+    let groupName: string | null = null;
+    for (let i = textMatches.length - 1; i >= 0; i--) {
+      const candidate = textMatches[i][1].trim();
+      if (candidate && candidate.length > 1 && candidate.length < 60 
+          && !serviceNameSet.has(candidate) 
+          && !/^\d+$/.test(candidate)
+          && !/^(subscribe|uptime|operational|status|system)/i.test(candidate)
+          && !/^\d+%/.test(candidate)) {
+        groupName = candidate;
+        break;
+      }
+    }
+    if (groupName) {
+      // Use the position in the full HTML for ordering
+      groups.push({ name: groupName, index: matchIdx });
+      console.log(`  Group detected: "${groupName}" (${match[1]} components) at index ${matchIdx}`);
     }
   }
 
-  if (groups.length === 0) return assignments;
+  if (groups.length === 0) {
+    console.log("No groups detected from HTML");
+    return assignments;
+  }
 
   console.log(`Detected ${groups.length} groups from HTML: ${groups.map(g => g.name).join(", ")}`);
 
-  // For each service, find which group it belongs to by checking
-  // if the service name appears after a group header in the HTML
-  const serviceNameSet = new Set(serviceNames);
-
+  // For each service, find which group it belongs to by position in the HTML
   for (const serviceName of serviceNames) {
-    // Find all occurrences of this service name in the HTML
     const escapedName = serviceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const svcPattern = new RegExp(`>${escapedName}<`, 'g');
     let svcMatch: RegExpExecArray | null;
     let bestGroup: string | null = null;
 
     while ((svcMatch = svcPattern.exec(html)) !== null) {
-      // Find the closest group header that appears BEFORE this service
       for (let i = groups.length - 1; i >= 0; i--) {
         if (groups[i].index < svcMatch.index) {
-          // Check there isn't a closer group after this one
           const nextGroupIdx = i < groups.length - 1 ? groups[i + 1].index : Infinity;
           if (svcMatch.index < nextGroupIdx) {
             bestGroup = groups[i].name;
