@@ -382,24 +382,6 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                     <Label className="text-xs text-muted-foreground">Status:</Label>
                     <span className={`text-xs font-medium capitalize ${updateStatusColors[analyzed.status]}`}>{analyzed.status}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">Impact:</Label>
-                    <Select
-                      value={analyzed.impact}
-                      onValueChange={(val) => setAnalyzed((prev) => prev ? { ...prev, impact: val as ServiceStatus } : prev)}
-                    >
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0 w-auto gap-1 px-2">
-                        <span className={`font-medium ${statusConfig[analyzed.impact]?.colorClass}`}>{statusConfig[analyzed.impact]?.label}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </div>
 
