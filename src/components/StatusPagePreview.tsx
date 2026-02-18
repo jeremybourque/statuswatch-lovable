@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2, Activity, ChevronDown } from "lucide-react";
+import { Loader2, Plus, Trash2, Activity } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,32 +88,6 @@ function StatusDot({ status }: { status: ServiceStatus }) {
       )}
       <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotClass}`} />
     </span>
-  );
-}
-
-function CollapsibleGroup({ group, groupStatus, children }: { group: string; groupStatus: ServiceStatus; children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
-  return (
-    <div>
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between mb-2 group cursor-pointer"
-      >
-        <div className="flex items-center gap-2">
-          <StatusDot status={groupStatus} />
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {group}
-          </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
-            {statusConfig[groupStatus].label}
-          </span>
-          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
-        </div>
-      </button>
-      {!collapsed && children}
-    </div>
   );
 }
 
@@ -340,20 +314,14 @@ export function StatusPagePreview({
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
         {services.length > 0 && (() => {
-          // Group services: all services sharing the same group name are collected
-          // into a single block. The block order follows the first appearance of each
-          // group (or ungrouped service) in the array. Within each group the original
-          // order is preserved.
+          // Group services: grouped ones under their group header, ungrouped standalone
           const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
-          const groupIndex = new Map<string, number>(); // group name → index in groups[]
-
           services.forEach((service, i) => {
             const g = service.group || null;
-            if (g && groupIndex.has(g)) {
-              // Append to existing named group
-              groups[groupIndex.get(g)!].items.push({ service, originalIndex: i });
+            const existing = groups.find((gr) => gr.group === g);
+            if (existing) {
+              existing.items.push({ service, originalIndex: i });
             } else {
-              if (g) groupIndex.set(g, groups.length);
               groups.push({ group: g, items: [{ service, originalIndex: i }] });
             }
           });
@@ -444,11 +412,22 @@ export function StatusPagePreview({
 
                 if (grp.group) {
                   return (
-                    <CollapsibleGroup key={`group-${gIdx}`} group={grp.group} groupStatus={groupStatus}>
+                    <div key={`group-${gIdx}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <StatusDot status={groupStatus} />
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            {grp.group}
+                          </h3>
+                        </div>
+                        <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
+                          {statusConfig[groupStatus].label}
+                        </span>
+                      </div>
                       <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
                         {grp.items.map(renderServiceRow)}
                       </div>
-                    </CollapsibleGroup>
+                    </div>
                   );
                 }
 
