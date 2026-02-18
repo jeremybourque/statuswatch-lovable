@@ -3,6 +3,7 @@ import { Activity, ArrowLeft, FileText, AlertTriangle, Network, PenLine } from "
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ClonePageContent } from "@/pages/AdminClonePage";
+import { IncidentPageContent } from "@/components/IncidentPageContent";
 
 type Choice = "incident" | "clone" | "diagram" | "manual";
 
@@ -145,7 +146,8 @@ const AdminNewPage = () => {
             }}
           >
             {selected === "clone" && <ClonePageContent />}
-            {selected && selected !== "clone" && (
+            {selected === "incident" && <IncidentPageContent />}
+            {selected && selected !== "clone" && selected !== "incident" && (
               <div className="border border-border rounded-lg p-8 bg-card">
                 <p className="text-muted-foreground text-center">
                   This section is under construction. Coming soon!
