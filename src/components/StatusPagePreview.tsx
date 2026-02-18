@@ -119,7 +119,7 @@ function CollapsibleGroup({
             type="text"
             value={groupName}
             onChange={(e) => onGroupNameChange?.(e.target.value)}
-            className="text-sm font-semibold text-muted-foreground uppercase tracking-wide bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors w-48"
+            className="text-sm font-semibold text-muted-foreground uppercase tracking-wide bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors flex-1 min-w-0"
           />
         </div>
         <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
