@@ -816,10 +816,10 @@ const AdminServices = () => {
       ) : (
         <main className="max-w-4xl mx-auto px-4 py-8">
           <Tabs defaultValue={defaultTab}>
-            <TabsList className="mb-6 px-4">
-              <TabsTrigger value="details">Page Details</TabsTrigger>
-              <TabsTrigger value="services">Services ({services.filter(s => s.status !== "operational").length}/{services.length})</TabsTrigger>
-              <TabsTrigger value="incidents">Incidents ({incidents.filter(i => i.status !== "resolved").length}/{incidents.length})</TabsTrigger>
+            <TabsList className="mb-6">
+              <TabsTrigger value="details" className="px-4">Page Details</TabsTrigger>
+              <TabsTrigger value="services" className="px-4">Services ({services.filter(s => s.status !== "operational").length}/{services.length})</TabsTrigger>
+              <TabsTrigger value="incidents" className="px-4">Incidents ({incidents.filter(i => i.status !== "resolved").length}/{incidents.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-3">
