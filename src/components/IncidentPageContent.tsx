@@ -116,8 +116,8 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
       <section
         className={`border rounded-xl p-6 transition-colors duration-300 ${
           collapsed
-            ? "border-input bg-background"
-            : "border-input bg-card"
+            ? "border-primary bg-accent"
+            : "border-border bg-card"
         }`}
       >
         <div
