@@ -41,9 +41,11 @@ const choices = [
 const AdminNewPage = () => {
   const [searchParams] = useSearchParams();
   const from = searchParams.get("from");
+  const initialChoice = searchParams.get("choice") as Choice | null;
+  const diagramUrl = searchParams.get("diagramUrl");
   const backTo = "/";
 
-  const [selected, setSelected] = useState<Choice | null>(null);
+  const [selected, setSelected] = useState<Choice | null>(initialChoice);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [offsets, setOffsets] = useState<number[]>([]);
 
@@ -149,7 +151,7 @@ const AdminNewPage = () => {
           >
             {selected === "clone" && <ClonePageContent />}
             {selected === "incident" && <IncidentPageContent navigateTo={backTo} />}
-            {selected === "diagram" && <DiagramPageContent navigateTo={backTo} />}
+            {selected === "diagram" && <DiagramPageContent navigateTo={backTo} initialUrl={diagramUrl || undefined} />}
             {selected === "manual" && (
               <StatusPagePreview
                 initialServices={[]}

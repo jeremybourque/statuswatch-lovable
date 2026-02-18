@@ -13,13 +13,13 @@ function slugify(text: string) {
     .replace(/^-|-$/g, "");
 }
 
-export function DiagramPageContent({ navigateTo = "/" }: { navigateTo?: string }) {
+export function DiagramPageContent({ navigateTo = "/", initialUrl }: { navigateTo?: string; initialUrl?: string }) {
   const { toast } = useToast();
 
-  const [mode, setMode] = useState<"idle" | "file" | "url">("idle");
+  const [mode, setMode] = useState<"idle" | "file" | "url">(initialUrl ? "url" : "idle");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(initialUrl || "");
   const [analyzing, setAnalyzing] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [previewData, setPreviewData] = useState<{
