@@ -214,7 +214,7 @@ const StatusPagesIndex = () => {
           <Activity className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold text-foreground tracking-tight">StatusWatch</h1>
           <div className="ml-auto flex items-center gap-2">
-            <Link to="/admin/new">
+            <Link to="/new">
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
                 New Page

@@ -22,7 +22,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<StatusPagesIndex />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/new" element={<AdminNewPage />} />
+          <Route path="/new" element={<AdminNewPage />} />
           <Route path="/admin/:slug/services" element={<AdminServices />} />
           <Route path="/admin/clone" element={<AdminClonePage />} />
           <Route path="/:slug" element={<StatusPageDetail />} />
