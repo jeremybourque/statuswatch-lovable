@@ -84,7 +84,9 @@ function StatusDot({ status }: { status: ServiceStatus }) {
   return (
     <span className="relative flex h-3 w-3">
       {status !== "operational" && (
-        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
+        <span
+          className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`}
+        />
       )}
       <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotClass}`} />
     </span>
@@ -119,7 +121,7 @@ function CollapsibleGroup({
             type="text"
             value={groupName}
             onChange={(e) => onGroupNameChange?.(e.target.value)}
-            className="text-sm font-semibold text-muted-foreground uppercase tracking-wide bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors min-w-0 max-w-[70%]"
+            className="text-sm font-semibold text-muted-foreground uppercase tracking-wide bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-4 transition-colors min-w-0 max-w-[70%]"
           />
         </div>
         <span className={`text-xs font-medium ${statusConfig[groupStatus].colorClass}`}>
@@ -211,10 +213,7 @@ export function StatusPagePreview({
       if (pageErr) throw pageErr;
 
       // Collect all services (top-level + from incidents)
-      const allServices = [
-        ...services,
-        ...incidents.flatMap((inc) => inc.services),
-      ];
+      const allServices = [...services, ...incidents.flatMap((inc) => inc.services)];
       if (allServices.length > 0) {
         // Build ordered groups matching visual order
         const orderedGroups: { group: string | null; items: PreviewService[] }[] = [];
@@ -280,10 +279,7 @@ export function StatusPagePreview({
           }
         }
 
-        const { data: createdServices, error: sErr } = await supabase
-          .from("services")
-          .insert(serviceRows)
-          .select("id");
+        const { data: createdServices, error: sErr } = await supabase.from("services").insert(serviceRows).select("id");
         if (sErr) throw sErr;
 
         // Save uptime_days for each service
@@ -314,9 +310,7 @@ export function StatusPagePreview({
 
       for (const inc of incidents) {
         const now = new Date().toISOString();
-        const incidentCreatedAt = inc.updates.length > 0
-          ? inc.updates[inc.updates.length - 1].timestamp
-          : now;
+        const incidentCreatedAt = inc.updates.length > 0 ? inc.updates[inc.updates.length - 1].timestamp : now;
 
         const { data: createdInc, error: incErr } = await supabase
           .from("incidents")
@@ -348,9 +342,7 @@ export function StatusPagePreview({
     } catch (err: any) {
       toast({
         title: "Failed to create",
-        description: err.message.includes("duplicate")
-          ? "A page with that slug already exists."
-          : err.message,
+        description: err.message.includes("duplicate") ? "A page with that slug already exists." : err.message,
         variant: "destructive",
       });
     } finally {
@@ -393,132 +385,138 @@ export function StatusPagePreview({
       {/* Services */}
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-foreground">Services</h3>
-         {services.length > 0 && (() => {
-          // Group services: grouped ones under their group header, ungrouped standalone
-          const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
-          services.forEach((service, i) => {
-            const g = service.group || null;
-            const last = groups.length > 0 ? groups[groups.length - 1] : null;
-            if (last && last.group === g) {
-              last.items.push({ service, originalIndex: i });
-            } else {
-              groups.push({ group: g, items: [{ service, originalIndex: i }] });
-            }
-          });
+        {services.length > 0 &&
+          (() => {
+            // Group services: grouped ones under their group header, ungrouped standalone
+            const groups: { group: string | null; items: { service: PreviewService; originalIndex: number }[] }[] = [];
+            services.forEach((service, i) => {
+              const g = service.group || null;
+              const last = groups.length > 0 ? groups[groups.length - 1] : null;
+              if (last && last.group === g) {
+                last.items.push({ service, originalIndex: i });
+              } else {
+                groups.push({ group: g, items: [{ service, originalIndex: i }] });
+              }
+            });
 
-          return (
-            <div className="space-y-6">
-              {groups.map((grp, gIdx) => {
-                const groupServices = grp.items.map((item) => item.service);
-                const groupStatus = getOverallStatus(groupServices);
+            return (
+              <div className="space-y-6">
+                {groups.map((grp, gIdx) => {
+                  const groupServices = grp.items.map((item) => item.service);
+                  const groupStatus = getOverallStatus(groupServices);
 
-                const renderServiceRow = (item: { service: PreviewService; originalIndex: number }) => {
-                  const { service, originalIndex: i } = item;
-                  return (
-                    <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                          <StatusDot status={service.status} />
-                          <input
-                            type="text"
-                            value={service.name}
-                            onChange={(e) => {
-                              setServices((prev) => {
-                                const updated = [...prev];
-                                updated[i] = { ...updated[i], name: e.target.value };
-                                return updated;
-                              });
-                            }}
-                            className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Select
-                            value={service.status}
-                            onValueChange={(val) => {
-                              setServices((prev) => {
-                                const updated = [...prev];
-                                updated[i] = { ...updated[i], status: val as ServiceStatus };
-                                return updated;
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
-                              <div className="flex items-center gap-2">
-                                <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
-                                  {statusConfig[service.status]?.label}
-                                </span>
-                              </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`font-medium ${statusConfig[s].colorClass}`}>{statusConfig[s].label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                            onClick={() => {
-                              setServices((prev) => prev.filter((_, idx) => idx !== i));
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-6">
-                        <TooltipProvider>
-                          <div className="flex-1 min-w-0">
-                            <UptimeBar days={(() => {
-                              const raw = service.uptimeDays ?? [];
-                              if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
-                              return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
-                            })()} />
+                  const renderServiceRow = (item: { service: PreviewService; originalIndex: number }) => {
+                    const { service, originalIndex: i } = item;
+                    return (
+                      <div key={i} className="p-4 bg-card hover:bg-accent/50 transition-colors space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                            <StatusDot status={service.status} />
+                            <input
+                              type="text"
+                              value={service.name}
+                              onChange={(e) => {
+                                setServices((prev) => {
+                                  const updated = [...prev];
+                                  updated[i] = { ...updated[i], name: e.target.value };
+                                  return updated;
+                                });
+                              }}
+                              className="font-medium text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
+                            />
                           </div>
-                        </TooltipProvider>
-                        <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
-                          {(service.uptime ?? 100).toFixed(2)}%
-                        </span>
+                          <div className="flex items-center gap-1">
+                            <Select
+                              value={service.status}
+                              onValueChange={(val) => {
+                                setServices((prev) => {
+                                  const updated = [...prev];
+                                  updated[i] = { ...updated[i], status: val as ServiceStatus };
+                                  return updated;
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[200px] h-9 text-sm border-none bg-transparent hover:bg-accent/50 focus:ring-0 focus:ring-offset-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium ${statusConfig[service.status]?.colorClass}`}>
+                                    {statusConfig[service.status]?.label}
+                                  </span>
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(Object.keys(statusConfig) as ServiceStatus[]).map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-medium ${statusConfig[s].colorClass}`}>
+                                        {statusConfig[s].label}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => {
+                                setServices((prev) => prev.filter((_, idx) => idx !== i));
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-6">
+                          <TooltipProvider>
+                            <div className="flex-1 min-w-0">
+                              <UptimeBar
+                                days={(() => {
+                                  const raw = service.uptimeDays ?? [];
+                                  if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
+                                  return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
+                                })()}
+                              />
+                            </div>
+                          </TooltipProvider>
+                          <span className="text-xs font-medium font-mono text-muted-foreground shrink-0 w-16 text-right">
+                            {(service.uptime ?? 100).toFixed(2)}%
+                          </span>
+                        </div>
                       </div>
+                    );
+                  };
+
+                  if (grp.group) {
+                    return (
+                      <CollapsibleGroup
+                        key={`group-${gIdx}`}
+                        groupName={grp.group}
+                        groupStatus={groupStatus}
+                        items={grp.items}
+                        renderServiceRow={renderServiceRow}
+                        onGroupNameChange={(newName) => {
+                          setServices((prev) =>
+                            prev.map((s) => (s.group === grp.group ? { ...s, group: newName } : s)),
+                          );
+                        }}
+                      />
+                    );
+                  }
+
+                  // Standalone services: each in its own card
+                  return grp.items.map((item) => (
+                    <div
+                      key={`standalone-${item.originalIndex}`}
+                      className="border border-border rounded-lg overflow-hidden"
+                    >
+                      {renderServiceRow(item)}
                     </div>
-                  );
-                };
-
-                if (grp.group) {
-                  return (
-                    <CollapsibleGroup
-                      key={`group-${gIdx}`}
-                      groupName={grp.group}
-                      groupStatus={groupStatus}
-                      items={grp.items}
-                      renderServiceRow={renderServiceRow}
-                      onGroupNameChange={(newName) => {
-                        setServices((prev) =>
-                          prev.map((s) =>
-                            s.group === grp.group ? { ...s, group: newName } : s
-                          )
-                        );
-                      }}
-                    />
-                  );
-                }
-
-                // Standalone services: each in its own card
-                return grp.items.map((item) => (
-                  <div key={`standalone-${item.originalIndex}`} className="border border-border rounded-lg overflow-hidden">
-                    {renderServiceRow(item)}
-                  </div>
-                ));
-              })}
-            </div>
-          );
-        })()}
+                  ));
+                })}
+              </div>
+            );
+          })()}
         <Button
           variant="outline"
           size="sm"
@@ -542,7 +540,10 @@ export function StatusPagePreview({
                 <input
                   type="text"
                   value={incident.title}
-                  onFocus={(e) => { const el = e.target; if (el.value === "New Incident") requestAnimationFrame(() => el.select()); }}
+                  onFocus={(e) => {
+                    const el = e.target;
+                    if (el.value === "New Incident") requestAnimationFrame(() => el.select());
+                  }}
                   onChange={(e) => updateIncident(incIndex, (prev) => ({ ...prev, title: e.target.value }))}
                   className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
                 />
@@ -558,7 +559,9 @@ export function StatusPagePreview({
               <div className="flex items-center gap-4 ml-5">
                 <div className="flex items-center gap-2">
                   <Label className="text-xs text-muted-foreground">Status:</Label>
-                  <span className={`text-xs font-medium capitalize ${updateStatusColors[incident.status]}`}>{incident.status}</span>
+                  <span className={`text-xs font-medium capitalize ${updateStatusColors[incident.status]}`}>
+                    {incident.status}
+                  </span>
                 </div>
               </div>
             </div>
@@ -600,7 +603,7 @@ export function StatusPagePreview({
                                 updateIncident(incIndex, (prev) => {
                                   const updates = [...prev.updates];
                                   updates[i] = { ...updates[i], status: val as PreviewUpdate["status"] };
-                                  const newStatus = i === 0 ? val as PreviewIncident["status"] : prev.status;
+                                  const newStatus = i === 0 ? (val as PreviewIncident["status"]) : prev.status;
                                   return { ...prev, updates, status: newStatus };
                                 });
                               }}
@@ -621,7 +624,13 @@ export function StatusPagePreview({
                             <span className="text-sm text-muted-foreground">—</span>
                             <input
                               type="datetime-local"
-                              value={(() => { try { return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm"); } catch { return ""; } })()}
+                              value={(() => {
+                                try {
+                                  return format(parseISO(update.timestamp), "yyyy-MM-dd'T'HH:mm");
+                                } catch {
+                                  return "";
+                                }
+                              })()}
                               onChange={(e) => {
                                 updateIncident(incIndex, (prev) => {
                                   const updates = [...prev.updates];
@@ -640,7 +649,10 @@ export function StatusPagePreview({
                               }
                             }}
                             value={update.message}
-                            onFocus={(e) => { const el = e.target; if (el.value === "New update...") requestAnimationFrame(() => el.select()); }}
+                            onFocus={(e) => {
+                              const el = e.target;
+                              if (el.value === "New update...") requestAnimationFrame(() => el.select());
+                            }}
                             onChange={(e) => {
                               const el = e.target;
                               el.style.height = "auto";
@@ -677,11 +689,7 @@ export function StatusPagePreview({
             )}
           </div>
         ))}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addBlankIncident}
-        >
+        <Button variant="outline" size="sm" onClick={addBlankIncident}>
           <Plus className="h-4 w-4 mr-1" />
           Add Incident
         </Button>
@@ -697,16 +705,8 @@ export function StatusPagePreview({
                 : "Enter a slug above to continue."}
           </p>
         )}
-        <Button
-          onClick={handleCreate}
-          disabled={creating || !name.trim() || !slug.trim()}
-          className="ml-auto shrink-0"
-        >
-          {creating ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-          ) : (
-            <Plus className="h-4 w-4 mr-1" />
-          )}
+        <Button onClick={handleCreate} disabled={creating || !name.trim() || !slug.trim()} className="ml-auto shrink-0">
+          {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
           Create Status Page
         </Button>
       </div>
