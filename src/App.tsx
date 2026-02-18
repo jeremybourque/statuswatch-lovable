@@ -7,6 +7,7 @@ import StatusPagesIndex from "./pages/StatusPagesIndex";
 import StatusPageDetail from "./pages/StatusPageDetail";
 import AdminNewPage from "./pages/AdminNewPage";
 import AdminServices from "./pages/AdminServices";
+import ResourcesPage from "./pages/ResourcesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<StatusPagesIndex />} />
           <Route path="/new" element={<AdminNewPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/:slug/edit" element={<AdminServices />} />
           
           <Route path="/:slug" element={<StatusPageDetail />} />
