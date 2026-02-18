@@ -27,6 +27,7 @@ interface ExtractedIncident {
   status: "investigating" | "identified" | "monitoring" | "resolved";
   impact: ServiceStatus;
   created_at: string;
+  detail_url?: string | null;
   updates: ExtractedIncidentUpdate[];
 }
 
@@ -672,6 +673,7 @@ Return ONLY valid JSON:
       "status": "investigating|identified|monitoring|resolved",
       "impact": "operational|degraded|partial|major|maintenance",
       "created_at": "ISO 8601 timestamp or date string",
+      "detail_url": "URL to the incident detail page if the title is a link, otherwise null",
       "updates": [
         { "status": "investigating|identified|monitoring|resolved", "message": "Update text", "timestamp": "ISO 8601 timestamp" }
       ]
@@ -685,7 +687,8 @@ CRITICAL RULES:
 3. Map impact: minor/degraded → "degraded", major/partial → "partial", critical/outage → "major", maintenance → "maintenance".
 4. If no timestamp is available for an update, use the incident's created_at.
 5. If you cannot determine exact timestamps, use reasonable ISO 8601 dates based on relative text like "2 days ago".
-6. Return an empty incidents array if no incidents are found.`;
+6. Return an empty incidents array if no incidents are found.
+7. IMPORTANT: If the incident title is wrapped in an <a> tag (a link), extract the full href URL into "detail_url". This is critical for fetching additional updates.`;
 
 function findIncidentHistoryUrl(html: string, baseUrl: string): string | null {
   // Look for links to incident history pages
@@ -730,11 +733,58 @@ function parseIncidentsFromAIResult(result: any): ExtractedIncident[] {
     status: inc.status || "resolved",
     impact: inc.impact || "major",
     created_at: inc.created_at || new Date().toISOString(),
+    detail_url: inc.detail_url || null,
     updates: (inc.updates || []).map((u: any) => ({
       status: u.status || "investigating",
       message: u.message || "",
       timestamp: u.timestamp || inc.created_at || new Date().toISOString(),
     })),
+  }));
+}
+
+const INCIDENT_DETAIL_SYSTEM_PROMPT = `You extract incident timeline updates from an incident detail page HTML.
+
+Return ONLY valid JSON:
+{
+  "updates": [
+    { "status": "investigating|identified|monitoring|maintenance|resolved", "message": "Update text", "timestamp": "ISO 8601 timestamp" }
+  ]
+}
+
+CRITICAL RULES:
+1. Extract ALL timeline updates/entries shown on the page, in chronological order (newest first).
+2. Each update has a status, a message body, and a timestamp.
+3. Map statuses: investigating, identified, monitoring, maintenance, resolved. If unclear, use "investigating".
+4. Include the full message text for each update.
+5. Use ISO 8601 timestamps. If only a date is shown, use midnight UTC.`;
+
+async function scrapeIncidentDetailPage(
+  apiKey: string,
+  url: string,
+  progress: ProgressFn,
+): Promise<ExtractedIncidentUpdate[]> {
+  let html: string;
+  try {
+    const res = await fetchWithRetries(url);
+    html = await res.text();
+  } catch {
+    html = await fetchRenderedHTML(url);
+  }
+
+  const stripped = stripForServices(html);
+  if (stripped.length < 100) return [];
+
+  const result = await callAI(
+    apiKey,
+    INCIDENT_DETAIL_SYSTEM_PROMPT,
+    "Extract all incident timeline updates from this incident detail page:",
+    stripped
+  );
+
+  return (result.updates || []).map((u: any) => ({
+    status: u.status || "investigating",
+    message: u.message || "",
+    timestamp: u.timestamp || new Date().toISOString(),
   }));
 }
 
@@ -781,7 +831,7 @@ async function extractIncidentsViaAI(
         const historyIncidents = parseIncidentsFromAIResult(historyResult);
         progress(`Found ${historyIncidents.length} incidents on history page`);
 
-        // Merge, dedup by title + created_at
+        // Merge, dedup by title
         const seen = new Set(incidents.map(i => i.title));
         for (const inc of historyIncidents) {
           if (!seen.has(inc.title)) {
@@ -796,6 +846,52 @@ async function extractIncidentsViaAI(
     } catch (e: any) {
       progress(`Could not fetch incident history page: ${e.message}`);
     }
+  }
+
+  // Scrape individual incident detail pages for incidents with few updates
+  const origin = new URL(baseUrl).origin;
+  const incidentsToScrape = incidents.filter(
+    (inc) => inc.detail_url && inc.updates.length <= 1
+  );
+
+  if (incidentsToScrape.length > 0) {
+    progress(`Scraping ${incidentsToScrape.length} incident detail pages for additional updates...`);
+
+    // Process up to 5 detail pages in parallel to avoid excessive load
+    const batches: ExtractedIncident[][] = [];
+    for (let i = 0; i < incidentsToScrape.length; i += 5) {
+      batches.push(incidentsToScrape.slice(i, i + 5));
+    }
+
+    for (const batch of batches) {
+      const results = await Promise.allSettled(
+        batch.map(async (inc) => {
+          let detailUrl = inc.detail_url!;
+          // Resolve relative URLs
+          if (detailUrl.startsWith('/')) detailUrl = origin + detailUrl;
+          else if (!detailUrl.startsWith('http')) detailUrl = origin + '/' + detailUrl;
+
+          try {
+            const updates = await scrapeIncidentDetailPage(apiKey, detailUrl, progress);
+            if (updates.length > inc.updates.length) {
+              progress(`  ${inc.title}: found ${updates.length} updates (was ${inc.updates.length})`);
+              inc.updates = updates;
+              // Update incident status from the newest update
+              if (updates.length > 0) {
+                inc.status = updates[0].status as ExtractedIncident["status"];
+              }
+            }
+          } catch (e: any) {
+            console.warn(`Could not scrape detail page for "${inc.title}":`, e.message);
+          }
+        })
+      );
+    }
+  }
+
+  // Remove detail_url from final output (not needed downstream)
+  for (const inc of incidents) {
+    delete inc.detail_url;
   }
 
   return incidents;
