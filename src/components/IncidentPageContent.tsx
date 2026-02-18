@@ -349,17 +349,28 @@ export function IncidentPageContent() {
             />
           )}
 
-          <Button
-            onClick={handleCreate}
-            disabled={creating || !name.trim() || !slug.trim()}
-          >
-            {creating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <Plus className="h-4 w-4 mr-1" />
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !name.trim() || !slug.trim()}
+            >
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Plus className="h-4 w-4 mr-1" />
+              )}
+              Create Status Page
+            </Button>
+            {!creating && (!name.trim() || !slug.trim()) && (
+              <p className="text-sm text-muted-foreground">
+                {!name.trim() && !slug.trim()
+                  ? "Enter a page name and slug above to continue."
+                  : !name.trim()
+                    ? "Enter a page name above to continue."
+                    : "Enter a slug above to continue."}
+              </p>
             )}
-            Create Status Page
-          </Button>
+          </div>
         </section>
       )}
     </div>
