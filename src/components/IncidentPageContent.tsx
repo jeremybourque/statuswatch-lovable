@@ -434,6 +434,7 @@ export function IncidentPageContent({ navigateTo = "/" }: { navigateTo?: string 
                     <input
                       type="text"
                       value={incident.title}
+                      onFocus={(e) => { if (e.target.value === "New Incident") e.target.select(); }}
                       onChange={(e) => updateIncident(incIndex, (prev) => ({ ...prev, title: e.target.value }))}
                       className="font-semibold text-card-foreground bg-transparent border-none outline-none focus:ring-0 w-full hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors"
                     />
