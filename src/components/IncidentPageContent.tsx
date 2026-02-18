@@ -97,16 +97,22 @@ export function IncidentPageContent() {
       const result = await response.json();
       if (!result.success || !result.data) throw new Error("No data returned");
 
-      const data = result.data as AnalyzedIncident;
+      const data = result.data as AnalyzedIncident & { organization?: string };
       setAnalyzed(data);
 
-      // Auto-fill name from incident title
-      const pageName = `${data.title} Status`;
-      setName(pageName);
-      if (!slugManual) {
-        const baseSlug = slugify(pageName);
-        const uniqueSlug = await findUniqueSlug(baseSlug);
-        setSlug(uniqueSlug);
+      // Auto-fill name/slug only if organization is mentioned
+      const org = data.organization?.trim();
+      if (org) {
+        const pageName = `${org} Status`;
+        setName(pageName);
+        if (!slugManual) {
+          const baseSlug = slugify(pageName);
+          const uniqueSlug = await findUniqueSlug(baseSlug);
+          setSlug(uniqueSlug);
+        }
+      } else {
+        setName("");
+        setSlug("");
       }
 
       toast({

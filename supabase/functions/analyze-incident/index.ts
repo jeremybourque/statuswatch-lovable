@@ -68,6 +68,7 @@ You MUST use the extract_incident_data tool to return your analysis.`;
               parameters: {
                 type: "object",
                 properties: {
+                  organization: { type: "string", description: "Name of the organization/company experiencing the incident, or empty string if not mentioned" },
                   title: { type: "string", description: "Concise incident title" },
                   status: {
                     type: "string",
@@ -113,7 +114,7 @@ You MUST use the extract_incident_data tool to return your analysis.`;
                     },
                   },
                 },
-                required: ["title", "status", "impact", "services", "updates"],
+                required: ["organization", "title", "status", "impact", "services", "updates"],
                 additionalProperties: false,
               },
             },
