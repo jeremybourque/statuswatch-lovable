@@ -226,12 +226,27 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
     // Fetch incidents from API
     let incidents: ExtractedIncident[] = [];
+    let rawApiIncidents: any[] = [];
     try {
       progress("Fetching incidents from API...");
-      incidents = await fetchIncidentsFromAPI(origin, progress);
+      const result = await fetchIncidentsFromAPIWithRaw(origin, progress);
+      incidents = result.incidents;
+      rawApiIncidents = result.rawIncidents;
       progress(`Found ${incidents.length} incidents via API`);
     } catch (e: any) {
       progress(`Could not fetch incidents: ${e.message}`);
+    }
+
+    // Fallback: synthesize uptime from incidents when SVG parser found nothing
+    const hasAnyUptime = services.some(s => Array.isArray(s.uptime_days) && s.uptime_days.length > 0);
+    if (!hasAnyUptime && rawApiIncidents.length > 0) {
+      progress("No uptime bars found in page, synthesizing from incident history...");
+      // Build component ID → service name mapping
+      const componentIdToName = new Map<string, string>();
+      for (const c of allApiComponents) {
+        componentIdToName.set(c.id, c.name);
+      }
+      synthesizeUptimeFromIncidents(services, rawApiIncidents, componentIdToName, progress);
     }
 
     return { name: pageName, services, incidents, start_date: startDate };
@@ -354,7 +369,17 @@ function mapIncidentImpact(impact: string): ServiceStatus {
   }
 }
 
+async function fetchIncidentsFromAPIWithRaw(origin: string, progress: ProgressFn): Promise<{ incidents: ExtractedIncident[]; rawIncidents: any[] }> {
+  const result = await fetchIncidentsFromAPIInternal(origin, progress);
+  return result;
+}
+
 async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<ExtractedIncident[]> {
+  const result = await fetchIncidentsFromAPIInternal(origin, progress);
+  return result.incidents;
+}
+
+async function fetchIncidentsFromAPIInternal(origin: string, progress: ProgressFn): Promise<{ incidents: ExtractedIncident[]; rawIncidents: any[] }> {
   // Fetch both unresolved and recent resolved incidents
   const [unresolvedRes, resolvedRes] = await Promise.all([
     fetch(`${origin}/api/v2/incidents/unresolved.json`, {
@@ -366,6 +391,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   ]);
 
   const allIncidents: ExtractedIncident[] = [];
+  const allRawIncidents: any[] = [];
   const seenIds = new Set<string>();
   const incidentApiIds: string[] = [];
 
@@ -374,6 +400,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
       if (seenIds.has(inc.id)) continue;
       seenIds.add(inc.id);
       incidentApiIds.push(inc.id);
+      allRawIncidents.push(inc);
       const updates: ExtractedIncidentUpdate[] = (inc.incident_updates || []).map((u: any) => ({
         status: mapIncidentStatus(u.status),
         message: u.body || "",
@@ -529,7 +556,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
     }
   }
 
-  return allIncidents;
+  return { incidents: allIncidents, rawIncidents: allRawIncidents };
 }
 
 // ── HTML fetching ──
@@ -778,6 +805,81 @@ function parseSvgDeterministic(
   return result;
 }
 
+
+// ── Synthesize uptime from incident history (fallback when no SVG bars found) ──
+
+function synthesizeUptimeFromIncidents(
+  services: ExtractedService[],
+  rawIncidents: any[],
+  componentIdToName: Map<string, string>,
+  progress: ProgressFn,
+): void {
+  // Build a map: service name → Set of date strings where incidents occurred
+  const incidentDaysMap = new Map<string, Set<string>>();
+
+  for (const inc of rawIncidents) {
+    // Determine the date range this incident was active
+    const createdAt = new Date(inc.created_at);
+    const resolvedAt = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
+
+    // Get affected component names from the incident's components array
+    const affectedNames: string[] = [];
+    if (Array.isArray(inc.components)) {
+      for (const comp of inc.components) {
+        const name = componentIdToName.get(comp.id) || comp.name;
+        if (name) affectedNames.push(name);
+      }
+    }
+
+    // If no components listed, skip (can't attribute to specific services)
+    if (affectedNames.length === 0) continue;
+
+    // Mark each day the incident was active
+    const startDay = new Date(createdAt);
+    startDay.setUTCHours(0, 0, 0, 0);
+    const endDay = new Date(resolvedAt);
+    endDay.setUTCHours(0, 0, 0, 0);
+
+    for (let d = new Date(startDay); d <= endDay; d.setUTCDate(d.getUTCDate() + 1)) {
+      const dayKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      for (const name of affectedNames) {
+        if (!incidentDaysMap.has(name)) incidentDaysMap.set(name, new Set());
+        incidentDaysMap.get(name)!.add(dayKey);
+      }
+    }
+  }
+
+  // Build 90-day uptime arrays for each service
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  let synthesizedCount = 0;
+  for (const svc of services) {
+    const incidentDays = incidentDaysMap.get(svc.name);
+    const days: (boolean | null)[] = [];
+    let downDays = 0;
+
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - i);
+      const dayKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+
+      if (incidentDays?.has(dayKey)) {
+        days.push(false);
+        downDays++;
+      } else {
+        days.push(true);
+      }
+    }
+
+    svc.uptime_days = days;
+    svc.uptime_pct = parseFloat((((90 - downDays) / 90) * 100).toFixed(4));
+    synthesizedCount++;
+  }
+
+  progress(`Synthesized uptime from incidents for ${synthesizedCount} services (${incidentDaysMap.size} had incidents)`);
+  console.log(`synthesizeUptimeFromIncidents: ${synthesizedCount} services, ${incidentDaysMap.size} with incident days`);
+}
 
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string, htmlContent: string, timeoutMs = 120000): Promise<any> {
   const truncated = htmlContent.slice(0, 800000);
