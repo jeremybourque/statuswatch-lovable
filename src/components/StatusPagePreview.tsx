@@ -502,7 +502,7 @@ export function StatusPagePreview({
                                 return { ...prev, updates };
                               });
                             }}
-                            className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 -mx-1 transition-colors resize-none overflow-hidden"
+                            className="text-sm text-card-foreground mt-1 leading-relaxed w-full bg-transparent border-none outline-none focus:ring-0 hover:bg-accent focus:bg-accent rounded px-1 transition-colors resize-none overflow-hidden"
                             rows={1}
                           />
                         </div>
