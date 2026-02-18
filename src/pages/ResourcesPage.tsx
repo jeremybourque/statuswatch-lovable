@@ -26,8 +26,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Activity, Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Activity, Plus, Pencil, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 type ResourceType = "status_page" | "system_diagram" | "incident_description";
@@ -114,6 +114,7 @@ function ResourceForm({
 }
 
 const ResourcesPage = () => {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Resource | undefined>();
@@ -223,6 +224,17 @@ const ResourcesPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
+                        {r.type === "system_diagram" && r.url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Use in diagram analyzer"
+                            onClick={() => navigate(`/new?choice=diagram&diagramUrl=${encodeURIComponent(r.url!)}`)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
