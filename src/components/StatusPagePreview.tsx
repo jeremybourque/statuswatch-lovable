@@ -321,7 +321,11 @@ export function StatusPagePreview({
                 <div className="flex items-center gap-3">
                   <TooltipProvider>
                     <div className="flex-1">
-                      <UptimeBar days={service.uptimeDays ?? Array(UPTIME_DAYS_COUNT).fill(null)} />
+                      <UptimeBar days={(() => {
+                        const raw = service.uptimeDays ?? [];
+                        if (raw.length >= UPTIME_DAYS_COUNT) return raw.slice(-UPTIME_DAYS_COUNT);
+                        return [...Array(UPTIME_DAYS_COUNT - raw.length).fill(null), ...raw];
+                      })()} />
                     </div>
                   </TooltipProvider>
                   <span className="w-16 text-right font-mono text-sm text-muted-foreground shrink-0">
