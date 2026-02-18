@@ -78,10 +78,10 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
   );
 }
 
-export function ClonePageContent() {
+export function ClonePageContent({ initialUrl }: { initialUrl?: string } = {}) {
   const { toast } = useToast();
 
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl || "");
   const [fetching, setFetching] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedData | null>(null);
   const [previewName, setPreviewName] = useState("");
