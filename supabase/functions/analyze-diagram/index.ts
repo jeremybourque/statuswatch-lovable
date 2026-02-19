@@ -35,8 +35,28 @@ For the "suggested_name" field: Based on the URL path AND the services you detec
 
 You MUST use the extract_services tool to return your analysis.`;
 
+    // Extract a name hint from the URL by picking the most specific path segment
+    let urlNameHint = "";
+    if (imageUrl) {
+      try {
+        const u = new URL(imageUrl);
+        const segments = u.pathname.split("/").filter(Boolean);
+        // Remove generic segments: filenames, version-like, common dirs
+        const skipPatterns = /^(_images|images|assets|static|docs|doc|blob|raw|master|main|public|media|uploads|img|resources|v\d|newton|latest|stable|\d+\.\d+)$/i;
+        const candidates = segments
+          .map((s) => s.replace(/\.[^.]+$/, "")) // strip extension
+          .filter((s) => s.length > 1 && !skipPatterns.test(s));
+        // Pick the deepest meaningful segment (closest to the file)
+        const bestCandidate = candidates.length > 0 ? candidates[candidates.length - 1] : "";
+        if (bestCandidate) {
+          urlNameHint = bestCandidate.replace(/[-_]+/g, " ").trim();
+          urlNameHint = urlNameHint.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        }
+      } catch { /* ignore */ }
+    }
+
     const userContent: any[] = [
-      { type: "text", text: `Analyze this system diagram and extract all services and components.${imageUrl ? ` The image URL is: ${imageUrl}` : ""}` },
+      { type: "text", text: `Analyze this system diagram and extract all services and components.${urlNameHint ? ` Based on the URL, the suggested page name is "${urlNameHint}" — use this as the suggested_name unless you have strong reason to override it.` : imageUrl ? ` The image URL is: ${imageUrl}` : ""}` },
     ];
 
     let finalBase64 = imageBase64;
