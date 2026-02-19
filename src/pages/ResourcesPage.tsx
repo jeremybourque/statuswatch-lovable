@@ -163,8 +163,17 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
   };
 
   return (
-    <div className="group rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50 p-3 flex flex-col gap-2 min-w-0">
-      <div className="flex items-start gap-2.5">
+    <div className="group relative rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50 p-3 flex flex-col gap-2 min-w-0">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-1.5 right-1.5 h-6 w-6 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
+        onClick={onEdit}
+        title="Edit resource"
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <div className="flex items-start gap-2.5 pr-5">
         {faviconUrl && !faviconError ? (
           <button onClick={requestRefresh} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all mt-0.5" title="Refresh favicon">
             <img src={faviconUrl} alt="" className="h-5 w-5 rounded" onError={() => setFaviconError(true)} />
@@ -179,24 +188,15 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
           <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 mt-auto">
+      <div className="mt-auto">
         <Button
           variant="outline"
           size="sm"
-          className="flex-1 h-7 text-xs"
+          className="w-full h-7 text-xs"
           onClick={launchAction}
         >
           <ExternalLink className="h-3 w-3 mr-1" />
           {actionLabel}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-7 w-7 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
-          onClick={onEdit}
-          title="Edit resource"
-        >
-          <Pencil className="h-3 w-3" />
         </Button>
       </div>
       {showPreview && previewUrl && (
