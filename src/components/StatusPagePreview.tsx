@@ -155,6 +155,22 @@ export function StatusPagePreview({
   const [slugManual, setSlugManual] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  const findUniqueSlug = async (base: string): Promise<string> => {
+    if (!base) return base;
+    let candidate = base;
+    let suffix = 1;
+    while (true) {
+      const { data } = await supabase
+        .from("status_pages")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!data) return candidate;
+      candidate = `${base}-${suffix}`;
+      suffix++;
+    }
+  };
+
   // Sync when initial data changes (e.g. after re-analyze)
   useEffect(() => {
     setServices(initialServices);
@@ -172,9 +188,13 @@ export function StatusPagePreview({
     if (!slugManual) setSlug(initialSlug);
   }, [initialSlug, slugManual]);
 
-  const handleNameChange = (val: string) => {
+  const handleNameChange = async (val: string) => {
     setName(val);
-    if (!slugManual) setSlug(slugify(val));
+    if (!slugManual) {
+      const base = slugify(val);
+      const unique = await findUniqueSlug(base);
+      setSlug(unique);
+    }
   };
 
   const updateIncident = (index: number, updater: (prev: PreviewIncident) => PreviewIncident) => {
