@@ -135,7 +135,7 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
   };
 
   const subtitle = resource.type === "incident_description"
-    ? (resource.content?.slice(0, 120) + (resource.content && resource.content.length > 120 ? "…" : ""))
+    ? (resource.content?.slice(0, 60) + (resource.content && resource.content.length > 60 ? "…" : ""))
     : resource.url;
 
   const actionLabel = resource.type === "status_page" ? "Clone" : "Analyze";
@@ -163,48 +163,50 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50">
-      <div className="group flex items-center gap-3 p-4">
+    <div className="group rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50 p-3 flex flex-col gap-2 min-w-0">
+      <div className="flex items-start gap-2.5">
         {faviconUrl && !faviconError ? (
-          <button onClick={requestRefresh} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all" title="Refresh favicon">
-            <img src={faviconUrl} alt="" className="h-5 w-5 rounded" />
+          <button onClick={requestRefresh} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all mt-0.5" title="Refresh favicon">
+            <img src={faviconUrl} alt="" className="h-5 w-5 rounded" onError={() => setFaviconError(true)} />
           </button>
         ) : resource.type === "status_page" ? (
-          <button onClick={requestRefresh} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Refresh favicon">
-            <RefreshCw className="h-5 w-5" />
+          <button onClick={requestRefresh} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5" title="Refresh favicon">
+            <RefreshCw className="h-4 w-4" />
           </button>
         ) : null}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground text-sm">{resource.name}</p>
+          <p className="font-medium text-foreground text-sm truncate">{resource.name}</p>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-8 w-8 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
-          onClick={onEdit}
-          title="Edit resource"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
+      </div>
+      <div className="flex items-center gap-1.5 mt-auto">
         <Button
           variant="outline"
           size="sm"
-          className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+          className="flex-1 h-7 text-xs"
           onClick={launchAction}
         >
-          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+          <ExternalLink className="h-3 w-3 mr-1" />
           {actionLabel}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-7 w-7 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
+          onClick={onEdit}
+          title="Edit resource"
+        >
+          <Pencil className="h-3 w-3" />
         </Button>
       </div>
       {showPreview && previewUrl && (
-        <div className="border-t border-border px-4 py-3 flex items-center gap-3 bg-muted/30 rounded-b-xl">
-          <img src={previewUrl} alt="New favicon" className="h-8 w-8 rounded border border-border" />
-          <p className="text-xs text-muted-foreground flex-1">Use this favicon?</p>
-          <Button variant="outline" size="sm" onClick={cancelRefresh}>Cancel</Button>
-          <Button size="sm" onClick={confirmRefresh}>
-            <Check className="h-3.5 w-3.5 mr-1" />
-            Accept
+        <div className="border-t border-border pt-2 flex items-center gap-2">
+          <img src={previewUrl} alt="New favicon" className="h-6 w-6 rounded border border-border" />
+          <p className="text-xs text-muted-foreground flex-1">Use?</p>
+          <Button variant="outline" size="sm" className="h-6 text-xs" onClick={cancelRefresh}>No</Button>
+          <Button size="sm" className="h-6 text-xs" onClick={confirmRefresh}>
+            <Check className="h-3 w-3 mr-1" />
+            Yes
           </Button>
         </div>
       )}
@@ -316,7 +318,7 @@ const ResourcesPage = () => {
                     <p className="text-xs text-muted-foreground">{config.description}</p>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {grouped[type].map((r) => (
                     <ResourceCard key={r.id} resource={r} navigate={navigate} onEdit={() => { setEditing(r); setDialogOpen(true); }} onSaveFavicon={(id, faviconUrl) => saveFavicon.mutate({ id, faviconUrl })} />
                   ))}
