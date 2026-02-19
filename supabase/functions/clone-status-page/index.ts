@@ -226,12 +226,52 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
 
     // Fetch incidents from API
     let incidents: ExtractedIncident[] = [];
+    let rawIncidents: any[] = [];
     try {
       progress("Fetching incidents from API...");
-      incidents = await fetchIncidentsFromAPI(origin, progress);
+      const incidentResult = await fetchIncidentsFromAPI(origin, progress);
+      incidents = incidentResult.incidents;
+      rawIncidents = incidentResult.rawIncidents;
       progress(`Found ${incidents.length} incidents via API`);
     } catch (e: any) {
       progress(`Could not fetch incidents: ${e.message}`);
+    }
+
+    // If SVG parser found no meaningful uptime data, synthesize from incident history.
+    // "Meaningful" = at least one service has a non-null uptime_pct OR has some false days.
+    const hasRealUptimeData = services.some(s => 
+      (s.uptime_days && s.uptime_days.length > 0 && s.uptime_days.some(d => d === false)) ||
+      (s.uptime_pct !== null && s.uptime_pct !== undefined)
+    );
+    if (!hasRealUptimeData) {
+      // Clear any false-positive uptime_days (e.g. from icon SVGs)
+      for (const svc of services) {
+        svc.uptime_days = null;
+        svc.uptime_pct = null;
+      }
+
+      if (rawIncidents.length > 0) {
+        progress("No meaningful SVG uptime data found — synthesizing from incident history...");
+        // Build component ID → name map
+        const componentIdToName = new Map<string, string>();
+        for (const c of allApiComponents) {
+          if (!c.group) componentIdToName.set(c.id, c.name);
+        }
+        // Extract component IDs from raw incident data
+        const incidentsWithComponents: IncidentWithComponents[] = rawIncidents.map((inc: any) => ({
+          created_at: inc.created_at,
+          resolved_at: inc.resolved_at || null,
+          component_ids: (inc.components || []).map((c: any) => c.id),
+        }));
+        synthesizeUptimeFromIncidents(services, incidentsWithComponents, componentIdToName, 90, progress);
+      } else {
+        progress("No uptime data or incidents found — generating default uptime bars...");
+        // Generate all-green bars for services with no incident data
+        for (const svc of services) {
+          svc.uptime_days = Array(90).fill(true);
+          svc.uptime_pct = 100;
+        }
+      }
     }
 
     return { name: pageName, services, incidents, start_date: startDate };
@@ -354,7 +394,83 @@ function mapIncidentImpact(impact: string): ServiceStatus {
   }
 }
 
-async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<ExtractedIncident[]> {
+// ── Synthesize uptime days from incident history ──
+// When no SVG uptime bars are found, build 90-day uptime arrays from incident data
+
+interface IncidentWithComponents {
+  created_at: string;
+  resolved_at?: string | null;
+  component_ids: string[];
+}
+
+function synthesizeUptimeFromIncidents(
+  services: ExtractedService[],
+  incidentData: IncidentWithComponents[],
+  componentIdToName: Map<string, string>,
+  numDays: number = 90,
+  progress: ProgressFn,
+): void {
+  const now = new Date();
+  // Build date strings for the last N days
+  const dayDates: string[] = [];
+  for (let i = numDays - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    dayDates.push(d.toISOString().slice(0, 10));
+  }
+
+  // Build a map: service name → set of affected date strings
+  const affectedDays = new Map<string, Set<string>>();
+
+  for (const inc of incidentData) {
+    const start = new Date(inc.created_at);
+    const end = inc.resolved_at ? new Date(inc.resolved_at) : now;
+
+    // Get affected service names
+    const affectedNames: string[] = [];
+    for (const cid of inc.component_ids) {
+      const name = componentIdToName.get(cid);
+      if (name) affectedNames.push(name);
+    }
+
+    if (affectedNames.length === 0) continue;
+
+    // Mark each day in the incident window
+    for (const name of affectedNames) {
+      if (!affectedDays.has(name)) affectedDays.set(name, new Set());
+      const days = affectedDays.get(name)!;
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+      while (cursor <= endDate) {
+        days.add(cursor.toISOString().slice(0, 10));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+  }
+
+  let synthesizedCount = 0;
+  for (const svc of services) {
+    if (svc.uptime_days && svc.uptime_days.length > 0) continue; // already has data
+    const affected = affectedDays.get(svc.name);
+    const days: (boolean | null)[] = dayDates.map(d => {
+      if (affected && affected.has(d)) return false;
+      return true;
+    });
+    svc.uptime_days = days;
+    // Calculate uptime percentage
+    const upCount = days.filter(d => d === true).length;
+    svc.uptime_pct = parseFloat(((upCount / days.length) * 100).toFixed(2));
+    synthesizedCount++;
+  }
+
+  if (synthesizedCount > 0) {
+    progress(`Synthesized uptime bars for ${synthesizedCount} services from incident history`);
+  }
+}
+
+async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Promise<{ incidents: ExtractedIncident[]; rawIncidents: any[] }> {
   // Fetch both unresolved and recent resolved incidents
   const [unresolvedRes, resolvedRes] = await Promise.all([
     fetch(`${origin}/api/v2/incidents/unresolved.json`, {
@@ -366,6 +482,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
   ]);
 
   const allIncidents: ExtractedIncident[] = [];
+  const rawIncidents: any[] = [];
   const seenIds = new Set<string>();
   const incidentApiIds: string[] = [];
 
@@ -374,6 +491,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
       if (seenIds.has(inc.id)) continue;
       seenIds.add(inc.id);
       incidentApiIds.push(inc.id);
+      rawIncidents.push(inc);
       const updates: ExtractedIncidentUpdate[] = (inc.incident_updates || []).map((u: any) => ({
         status: mapIncidentStatus(u.status),
         message: u.body || "",
@@ -529,7 +647,7 @@ async function fetchIncidentsFromAPI(origin: string, progress: ProgressFn): Prom
     }
   }
 
-  return allIncidents;
+  return { incidents: allIncidents, rawIncidents };
 }
 
 // ── HTML fetching ──
