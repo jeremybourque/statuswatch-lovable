@@ -66,7 +66,7 @@ function ActivityLog({ entries, isComplete }: { entries: LogEntry[]; isComplete:
               {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />}
               {entry.status === "pending" && <Loader2 className="h-4 w-4 text-muted-foreground animate-spin mt-0.5 shrink-0" />}
               {entry.status === "error" && <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
-              <span className={entry.status === "error" ? "text-destructive" : entry.status === "pending" ? "text-muted-foreground" : "text-foreground"}>
+              <span className={`truncate ${entry.status === "error" ? "text-destructive" : entry.status === "pending" ? "text-muted-foreground" : "text-foreground"}`}>
                 {entry.message}
               </span>
             </div>
