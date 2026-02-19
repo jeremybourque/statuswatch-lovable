@@ -268,7 +268,7 @@ const ResourcesPage = () => {
   });
 
   const grouped = typeOrder.reduce((acc, type) => {
-    acc[type] = resources.filter((r) => r.type === type);
+    acc[type] = resources.filter((r) => r.type === type).sort((a, b) => a.name.localeCompare(b.name));
     return acc;
   }, {} as Record<ResourceType, Resource[]>);
 
