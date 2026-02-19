@@ -331,7 +331,7 @@ export function StatusPagePreview({
         if (inc.updates.length > 0) {
           const updateRows = inc.updates.map((u) => ({
             incident_id: createdInc.id,
-            status: u.status,
+            status: validStatuses.includes(u.status as any) ? u.status : "investigating",
             message: u.message,
             created_at: u.timestamp,
           }));
