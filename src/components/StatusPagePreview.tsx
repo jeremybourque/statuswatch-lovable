@@ -312,12 +312,15 @@ export function StatusPagePreview({
         const now = new Date().toISOString();
         const incidentCreatedAt = inc.updates.length > 0 ? inc.updates[inc.updates.length - 1].timestamp : now;
 
+        const validStatuses = ["investigating", "identified", "monitoring", "resolved"] as const;
+        const sanitizedStatus = validStatuses.includes(inc.status as any) ? inc.status : "investigating";
+
         const { data: createdInc, error: incErr } = await supabase
           .from("incidents")
           .insert({
             status_page_id: page.id,
             title: inc.title,
-            status: inc.status,
+            status: sanitizedStatus,
             impact: inc.impact,
             created_at: incidentCreatedAt,
           })
