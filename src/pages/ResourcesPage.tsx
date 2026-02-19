@@ -125,12 +125,12 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
 
   const launchAction = () => {
     if (resource.type === "status_page" && resource.url) {
-      navigate(`/new?choice=clone&cloneUrl=${encodeURIComponent(resource.url)}`);
+      navigate(`/new?from=resources&choice=clone&cloneUrl=${encodeURIComponent(resource.url)}`);
     } else if (resource.type === "system_diagram" && resource.url) {
-      navigate(`/new?choice=diagram&diagramUrl=${encodeURIComponent(resource.url)}`);
+      navigate(`/new?from=resources&choice=diagram&diagramUrl=${encodeURIComponent(resource.url)}`);
     } else if (resource.type === "incident_description" && resource.content) {
       sessionStorage.setItem("preloadIncidentDescription", resource.content);
-      navigate(`/new?choice=incident`);
+      navigate(`/new?from=resources&choice=incident`);
     }
   };
 

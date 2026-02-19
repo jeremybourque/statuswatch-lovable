@@ -54,7 +54,7 @@ const AdminNewPage = () => {
     }
     return undefined;
   });
-  const backTo = "/";
+  const backTo = from === "resources" ? "/resources" : "/";
 
   const [selected, setSelected] = useState<Choice | null>(initialChoice);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
