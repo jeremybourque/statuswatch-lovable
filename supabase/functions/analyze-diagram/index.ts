@@ -31,7 +31,7 @@ Group related services when there's a clear hierarchy (e.g. "API" might have sub
 
 Be thorough - extract every distinct service, database, queue, cache, load balancer, CDN, etc. that appears in the diagram.
 
-For the "suggested_name" field: Based on the URL path/filename AND the services you detected, produce a short, human-friendly status page title (2-4 words max). Infer the product or platform name from URL segments (e.g. "openstack/watcher" → "OpenStack Watcher", "aws-architecture.png" → "AWS Infrastructure"). If the URL has no useful hints, derive the name from the services found. Examples: "Mobile App Backend", "OpenStack Watcher", "Payment Gateway".
+For the "suggested_name" field: Based on the URL path AND the services you detected, produce a short, human-friendly status page title (2-4 words max). When inferring from the URL, prefer the MOST SPECIFIC path segment closest to the image file — this is usually the actual product name. Generic parent segments like organization or platform names (e.g. "openstack", "aws", "google") should only be used if no more specific segment exists. For example: URL "docs.openstack.org/watcher/newton/_images/architecture.svg" → "Watcher" (NOT "OpenStack"), URL "github.com/acme/payment-gateway/docs/arch.png" → "Payment Gateway" (NOT "Acme"). If the URL has no useful hints, derive the name purely from the services found.
 
 You MUST use the extract_services tool to return your analysis.`;
 
