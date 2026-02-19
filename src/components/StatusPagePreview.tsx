@@ -279,14 +279,18 @@ export function StatusPagePreview({
           createdParents?.forEach((p) => parentMap.set(p.name, p.id));
         }
 
-        // Create child / ungrouped services with sequential display_order
+        // Create child / ungrouped services with sequential display_order (deduplicated by name+group)
         let childOrder = 0;
         const serviceRows: any[] = [];
+        const seenServiceKeys = new Set<string>();
         for (const grp of orderedGroups) {
           if (grp.group) {
             childOrder = parentOrderMap.get(grp.group)! + 1;
           }
           for (const s of grp.items) {
+            const dedupeKey = `${s.name}::${s.group ?? ""}`;
+            if (seenServiceKeys.has(dedupeKey)) continue;
+            seenServiceKeys.add(dedupeKey);
             serviceRows.push({
               name: s.name,
               status: s.status,
