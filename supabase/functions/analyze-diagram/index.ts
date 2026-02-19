@@ -31,7 +31,7 @@ Group related services when there's a clear hierarchy (e.g. "API" might have sub
 
 Be thorough - extract every distinct service, database, queue, cache, load balancer, CDN, etc. that appears in the diagram.
 
-For the "suggested_name" field: produce a short, human-friendly status page title (2-4 words max) that captures what this system is. Examples: "Mobile App Backend", "E-Commerce Platform", "Payment Gateway". Do NOT just repeat the filename verbatim.
+For the "suggested_name" field: Based on the URL path/filename AND the services you detected, produce a short, human-friendly status page title (2-4 words max). Infer the product or platform name from URL segments (e.g. "openstack/watcher" → "OpenStack Watcher", "aws-architecture.png" → "AWS Infrastructure"). If the URL has no useful hints, derive the name from the services found. Examples: "Mobile App Backend", "OpenStack Watcher", "Payment Gateway".
 
 You MUST use the extract_services tool to return your analysis.`;
 
