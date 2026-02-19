@@ -341,7 +341,7 @@ export function StatusPagePreview({
       }
 
       toast({ title: "Status page created!" });
-      navigate(navigateTo);
+      navigate(`/${slug}`);
     } catch (err: any) {
       toast({
         title: "Failed to create",
