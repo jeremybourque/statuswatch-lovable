@@ -174,6 +174,26 @@ export function DiagramPageContent({ navigateTo = "/", initialUrl }: { navigateT
 
       const org = data.organization?.trim();
       let pageName = org || "";
+
+      // Fallback: derive name from the image URL filename
+      if (!pageName && imageUrl.trim()) {
+        try {
+          const pathname = new URL(imageUrl.trim()).pathname;
+          const filename = pathname.split("/").pop() || "";
+          const nameFromFile = filename
+            .replace(/\.[^.]+$/, "")           // strip extension
+            .replace(/[-_]+/g, " ")            // dashes/underscores → spaces
+            .replace(/\s+/g, " ")
+            .trim();
+          if (nameFromFile.length > 2) {
+            pageName = nameFromFile
+              .split(" ")
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(" ");
+          }
+        } catch { /* invalid URL, skip */ }
+      }
+
       let pageSlug = "";
       if (pageName) {
         pageSlug = await findUniqueSlug(slugify(pageName));
