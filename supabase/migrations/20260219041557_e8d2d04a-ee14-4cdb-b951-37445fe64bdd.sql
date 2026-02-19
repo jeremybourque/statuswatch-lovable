@@ -1,0 +1,2 @@
+ALTER TABLE public.incidents DROP CONSTRAINT IF EXISTS incidents_status_check;
+ALTER TABLE public.incidents ADD CONSTRAINT incidents_status_check CHECK (status IN ('investigating', 'identified', 'monitoring', 'maintenance', 'resolved'));

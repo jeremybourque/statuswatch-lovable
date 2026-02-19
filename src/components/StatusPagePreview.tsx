@@ -312,7 +312,7 @@ export function StatusPagePreview({
         const now = new Date().toISOString();
         const incidentCreatedAt = inc.updates.length > 0 ? inc.updates[inc.updates.length - 1].timestamp : now;
 
-        const validStatuses = ["investigating", "identified", "monitoring", "resolved"] as const;
+        const validStatuses = ["investigating", "identified", "monitoring", "maintenance", "resolved"] as const;
         const sanitizedStatus = validStatuses.includes(inc.status as any) ? inc.status : "investigating";
 
         const { data: createdInc, error: incErr } = await supabase
