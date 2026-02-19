@@ -1394,7 +1394,8 @@ CRITICAL RULES:
 5. Do NOT use the "group" field — use "children" for hierarchy instead. Set "group" to null for all services.
 6. Extract ALL services, including those inside collapsed/hidden sections.
 7. Map statuses: green/up/operational -> "operational", yellow/degraded/slow -> "degraded", orange/partial -> "partial", red/down/major -> "major", blue/maintenance/scheduled -> "maintenance". If unsure, use "operational".
-8. For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.`,
+8. For the "name" field, remove trailing suffixes like "| Status", "Status", "- Status Page". Return just the clean company/product name.
+9. Do NOT include scheduled maintenance notices, incident reports, or announcements as services. Only extract actual system components/services that have a status indicator.`,
     "Extract the status page name and ALL services (including nested/child services within parent categories) from this HTML:",
     servicesHtml
   );
