@@ -173,16 +173,16 @@ export function DiagramPageContent({ navigateTo = "/", initialUrl }: { navigateT
         }));
 
       const org = data.organization?.trim();
-      let pageName = org || "";
+      let pageName = org || data.suggested_name?.trim() || "";
 
-      // Fallback: derive name from the image URL filename
+      // Last-resort fallback: derive name from the image URL filename
       if (!pageName && imageUrl.trim()) {
         try {
           const pathname = new URL(imageUrl.trim()).pathname;
           const filename = pathname.split("/").pop() || "";
           const nameFromFile = filename
-            .replace(/\.[^.]+$/, "")           // strip extension
-            .replace(/[-_]+/g, " ")            // dashes/underscores → spaces
+            .replace(/\.[^.]+$/, "")
+            .replace(/[-_]+/g, " ")
             .replace(/\s+/g, " ")
             .trim();
           if (nameFromFile.length > 2) {

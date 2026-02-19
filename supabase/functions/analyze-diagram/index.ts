@@ -31,10 +31,12 @@ Group related services when there's a clear hierarchy (e.g. "API" might have sub
 
 Be thorough - extract every distinct service, database, queue, cache, load balancer, CDN, etc. that appears in the diagram.
 
+For the "suggested_name" field: produce a short, human-friendly status page title (2-4 words max) that captures what this system is. Examples: "Mobile App Backend", "E-Commerce Platform", "Payment Gateway". Do NOT just repeat the filename verbatim.
+
 You MUST use the extract_services tool to return your analysis.`;
 
     const userContent: any[] = [
-      { type: "text", text: "Analyze this system diagram and extract all services and components:" },
+      { type: "text", text: `Analyze this system diagram and extract all services and components.${imageUrl ? ` The image URL is: ${imageUrl}` : ""}` },
     ];
 
     let finalBase64 = imageBase64;
@@ -139,8 +141,12 @@ You MUST use the extract_services tool to return your analysis.`;
                     type: "string",
                     description: "Brief one-line summary of the system architecture",
                   },
+                  suggested_name: {
+                    type: "string",
+                    description: "A short 2-4 word human-friendly name for this system suitable as a status page title, e.g. 'Mobile App Backend' or 'E-Commerce Platform'",
+                  },
                 },
-                required: ["organization", "services", "summary"],
+                required: ["organization", "services", "summary", "suggested_name"],
                 additionalProperties: false,
               },
             },
