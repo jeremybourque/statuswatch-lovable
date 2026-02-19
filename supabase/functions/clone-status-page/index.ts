@@ -60,7 +60,14 @@ async function tryStatuspageAPI(baseUrl: string, progress: ProgressFn): Promise<
   try {
     progress("Checking for Atlassian Statuspage API...");
     const summaryRes = await fetch(`${origin}/api/v2/summary.json`, {
-      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      headers: { 
+        "Accept": "application/json", 
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+      },
     });
     if (!summaryRes.ok) return null;
     const summary = await summaryRes.json();
@@ -1338,7 +1345,13 @@ async function extractViaHTML(url: string, apiKey: string, progress: ProgressFn)
     const pageRes = await fetchWithRetries(url);
     rawHtml = await pageRes.text();
   } catch (fetchErr: any) {
-    throw new Error(fetchErr.message);
+    // Direct fetch blocked — try Firecrawl to bypass bot protection
+    progress("Direct fetch blocked, using Firecrawl to bypass bot protection...");
+    try {
+      rawHtml = await fetchRenderedHTML(url);
+    } catch (fcErr: any) {
+      throw new Error(`Could not fetch page: direct fetch blocked (${fetchErr.message}) and Firecrawl failed (${fcErr.message})`);
+    }
   }
 
   console.log("Fetched HTML length:", rawHtml.length);
