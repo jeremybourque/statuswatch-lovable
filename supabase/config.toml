@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-diagram]
 verify_jwt = false
+
+[functions.clone-status-page]
+verify_jwt = false
