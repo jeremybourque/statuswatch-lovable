@@ -164,15 +164,6 @@ function ResourceCard({ resource, navigate, onEdit, onSaveFavicon }: { resource:
 
   return (
     <div className="group relative rounded-xl border border-border bg-card transition-colors hover:border-primary/20 hover:bg-accent/50 p-3 flex flex-col gap-2 min-w-0">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-1.5 right-1.5 h-6 w-6 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
-        onClick={onEdit}
-        title="Edit resource"
-      >
-        <Pencil className="h-3 w-3" />
-      </Button>
       <div className="flex items-start gap-2.5 pr-5">
         {faviconUrl && !faviconError ? (
           <button onClick={requestRefresh} className="shrink-0 rounded hover:ring-2 hover:ring-primary/20 transition-all mt-0.5" title="Refresh favicon">
@@ -285,12 +276,6 @@ const ResourcesPage = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">Resources</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Saved references for quick-launch workflows</p>
-          </div>
-          <div className="ml-auto">
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
           </div>
         </div>
       </header>
